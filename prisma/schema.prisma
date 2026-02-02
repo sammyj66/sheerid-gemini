@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model CardKey {
+  id           String     @id @default(cuid())
+  code         String     @unique
+  status       CardStatus @default(UNUSED)
+  batchNo      String?
+  note         String?
+  createdAt    DateTime   @default(now())
+  expiresAt    DateTime?
+  consumedAt   DateTime?
+  consumedBy   String?
+  lockedAt     DateTime?
+  lockJobId    String?
+
+  verificationJobs VerificationJob[]
+}
+
+model VerificationJob {
+  id             String    @id @default(cuid())
+  sheeridUrl     String
+  verificationId String?
+  cardKeyCode    String
+  status         JobStatus @default(QUEUED)
+  resultMessage  String?
+  resultUrl      String?
+  errorCode      String?
+  upstreamReqId  String?
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  durationMs     Int?
+  createdAt      DateTime  @default(now())
+
+  cardKey CardKey @relation(fields: [cardKeyCode], references: [code])
+
+  @@index([verificationId])
+}
+
+model DailyStats {
+  id           String @id @default(cuid())
+  date         String @unique
+  successCount Int    @default(0)
+  failCount    Int    @default(0)
+  totalCount   Int    @default(0)
+}
+
+model AdminLog {
+  id        String   @id @default(cuid())
+  action    String
+  detail    String?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+enum CardStatus {
+  UNUSED
+  LOCKED
+  CONSUMED
+  REVOKED
+  EXPIRED
+}
+
+enum JobStatus {
+  QUEUED
+  PROCESSING
+  PENDING
+  SUCCESS
+  FAIL
+  ERROR
+  TIMEOUT
+}

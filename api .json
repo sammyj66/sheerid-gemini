@@ -1,0 +1,175 @@
+
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "验证 API",
+    "version": "1.0.0",
+    "description": "用于学生/教师验证的 API，支持验证码绕过（API Key）。"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "CsrfAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-CSRF-Token",
+        "description": "POST 请求需要的 CSRF Token。可在浏览器控制台通过 window.CSRF_TOKEN 获取，或从首页 HTML 解析。"
+      }
+    }
+  },
+  "security": [
+    {
+      "CsrfAuth": []
+    }
+  ],
+  "paths": {
+    "/api/batch": {
+      "post": {
+        "summary": "批量验证",
+        "description": "提交一批验证请求。返回事件流 (SSE)。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hCaptchaToken": {
+                    "type": "string",
+                    "description": "HCaptcha Token 或 API/CD Key"
+                  },
+                  "turnstileToken": {
+                    "type": "string",
+                    "description": "Turnstile Token (如果使用 API Key 则可选)"
+                  },
+                  "verificationIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "programId": {
+                    "type": "string",
+                    "deprecated": true
+                  },
+                  "useLucky": {
+                    "type": "boolean",
+                    "deprecated": true
+                  }
+                },
+                "required": ["hCaptchaToken", "verificationIds"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "事件流 (Event Stream)",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: start\ndata: {\"total\":1,\"current_quota\":99,\"cost\":1}\n\ndata: {\"verificationId\":\"vid_123\",\"currentStep\":\"success\",\"message\":\"Verified\"}\n\nevent: end\ndata: {\"completed\":1,\"total\":1}\n\n"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cancel": {
+      "post": {
+        "summary": "取消验证",
+        "description": "取消挂起的验证。需要有效的 CSRF Token。",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "verificationId": {
+                    "type": "string"
+                  }
+                },
+                "required": ["verificationId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "取消结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "verificationId": { "type": "string" },
+                    "currentStep": { "type": "string", "example": "error" },
+                    "message": { "type": "string", "example": "Cancelled" },
+                    "alreadyCancelled": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/check-status": {
+      "post": {
+        "summary": "检查状态",
+        "description": "检查挂起验证的状态。",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "checkToken": {
+                    "type": "string"
+                  }
+                },
+                "required": ["checkToken"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "状态结果",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currentStep": { "type": "string" },
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/status": {
+      "get": {
+        "summary": "系统状态",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "系统状态信息"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,65 +1,254 @@
-import Image from "next/image";
+"use client";
+
+import { useCallback, useState } from "react";
+import HelpModal from "@/components/HelpModal";
+import StatsWidget from "@/components/StatsWidget";
+import VerificationForm, {
+  VerificationFormPayload,
+} from "@/components/VerificationForm";
+import VerificationProgress, {
+  VerificationProgressItem,
+  VerificationStatus,
+} from "@/components/VerificationProgress";
+
+const completedStatuses = new Set<VerificationStatus>([
+  "success",
+  "fail",
+  "error",
+  "timeout",
+  "duplicate",
+]);
+
+function mapResultStatus(status?: string): VerificationStatus {
+  switch ((status || "").toUpperCase()) {
+    case "SUCCESS":
+      return "success";
+    case "FAIL":
+      return "fail";
+    case "TIMEOUT":
+      return "timeout";
+    case "ERROR":
+      return "error";
+    case "PENDING":
+      return "pending";
+    default:
+      return "error";
+  }
+}
 
 export default function Home() {
+  const [items, setItems] = useState<VerificationProgressItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [globalError, setGlobalError] = useState<string | null>(null);
+
+  const updateItem = useCallback(
+    (index: number, patch: Partial<VerificationProgressItem>) => {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.index === index ? { ...item, ...patch } : item
+        )
+      );
+    },
+    []
+  );
+
+  const handleEvent = useCallback(
+    (eventName: string, payload: Record<string, unknown>) => {
+      const index = typeof payload.index === "number" ? payload.index : -1;
+      if (index < 0) return;
+
+      if (eventName === "queued") {
+        updateItem(index, {
+          status: "processing",
+          jobId: payload.jobId as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+          message: "已进入队列",
+        });
+        return;
+      }
+
+      if (eventName === "duplicate") {
+        updateItem(index, {
+          status: "duplicate",
+          jobId: payload.jobId as string | undefined,
+          resultUrl: payload.resultUrl as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+          message: "已验证过，直接返回历史结果",
+        });
+        setRefreshToken((prev) => prev + 1);
+        return;
+      }
+
+      if (eventName === "error") {
+        updateItem(index, {
+          status: "error",
+          message: payload.message as string | undefined,
+        });
+        setRefreshToken((prev) => prev + 1);
+        return;
+      }
+
+      if (eventName === "result") {
+        const status = mapResultStatus(payload.status as string | undefined);
+        updateItem(index, {
+          status,
+          resultUrl: payload.resultUrl as string | undefined,
+          message: payload.message as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+        });
+        if (completedStatuses.has(status)) {
+          setRefreshToken((prev) => prev + 1);
+        }
+      }
+    },
+    [updateItem]
+  );
+
+  const parseSSE = useCallback(
+    async (stream: ReadableStream<Uint8Array>) => {
+      const reader = stream.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let eventName = "message";
+      let dataBuffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        while (buffer.includes("\n")) {
+          const newlineIndex = buffer.indexOf("\n");
+          const line = buffer.slice(0, newlineIndex).trimEnd();
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (!line) {
+            if (dataBuffer) {
+              const data = dataBuffer.trimEnd();
+              dataBuffer = "";
+              let payload: Record<string, unknown> = { message: data };
+              try {
+                payload = JSON.parse(data);
+              } catch {
+                // keep raw message
+              }
+              handleEvent(eventName, payload);
+            }
+            eventName = "message";
+            continue;
+          }
+
+          if (line.startsWith("event:")) {
+            eventName = line.slice(6).trim();
+            continue;
+          }
+
+          if (line.startsWith("data:")) {
+            dataBuffer += line.slice(5).trimStart() + "\n";
+          }
+        }
+      }
+
+      if (dataBuffer) {
+        const finalData = dataBuffer.trimEnd();
+        let payload: Record<string, unknown> = { message: finalData };
+        try {
+          payload = JSON.parse(finalData);
+        } catch {
+          // ignore
+        }
+        handleEvent(eventName, payload);
+      }
+    },
+    [handleEvent]
+  );
+
+  const handleSubmit = async (payload: VerificationFormPayload) => {
+    setGlobalError(null);
+    setIsSubmitting(true);
+
+    setItems(
+      payload.links.map((link, index) => ({
+        index,
+        link,
+        cardKey: payload.cardKeys[index] ?? "",
+        verificationId: payload.verificationIds[index],
+        status: "processing",
+        message: "等待上游响应",
+      }))
+    );
+
+    try {
+      const response = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          links: payload.links,
+          cardKeys: payload.cardKeys,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "请求失败");
+      }
+
+      if (!response.body) {
+        throw new Error("响应缺少 SSE 数据流");
+      }
+
+      await parseSSE(response.body);
+    } catch (error) {
+      setGlobalError(error instanceof Error ? error.message : "提交失败");
+      setItems((prev) =>
+        prev.map((item) =>
+          completedStatuses.has(item.status)
+            ? item
+            : { ...item, status: "error", message: "网络异常" }
+        )
+      );
+    } finally {
+      setIsSubmitting(false);
+      setRefreshToken((prev) => prev + 1);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+    <div className="page">
+      <div className="container">
+        <header className="header">
+          <div>
+            <h1 className="title">Gemini 学生认证平台</h1>
+            <p className="subtitle">
+              使用卡密激活 SheerID 学生验证，实时查看进度并获取验证结果。
+            </p>
+          </div>
+          <button className="help-button" onClick={() => setHelpOpen(true)}>
+            帮助
+          </button>
+        </header>
+
+        <section className="card">
+          <StatsWidget refreshToken={refreshToken} />
+        </section>
+
+        <section className="grid-two">
+          <div className="card">
+            <VerificationForm
+              isSubmitting={isSubmitting}
+              onSubmit={handleSubmit}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+          </div>
+          <div className="card">
+            {globalError && <div className="error-list">{globalError}</div>}
+            <VerificationProgress items={items} />
+          </div>
+        </section>
+      </div>
+
+      <HelpModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

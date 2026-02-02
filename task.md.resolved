@@ -1,0 +1,75 @@
+# Gemini Student Verification Platform - Task Breakdown
+
+## Phase 0: Environment Setup
+- [x] Initialize project with Next.js (frontend + API routes)
+- [x] Set up database (SQLite with Prisma for simplicity)
+- [x] Configure project structure and dependencies
+- [x] Ensure secrets stay in env files only (do not commit real CDK)
+
+
+## Phase 1: Core Backend Infrastructure
+- [x] Create database schema (CardKey, VerificationJob, DailyStats)
+- [ ] Implement card key CRUD API (generate, search, revoke)
+- [x] Implement card key state machine (Unused → Locked → Consumed/rollback)
+- [x] Integrate with neigui.1key.me API
+  - [x] CSRF token handling
+  - [ ] CDK 从环境变量 UPSTREAM_CDK 读取
+  - [ ] Batch verification with SSE parsing
+    - [ ] 解析 SSE 事件流：`processing` → `pending` → `result`
+    - [ ] 断线/重复事件幂等处理
+    - [ ] SSE 断线后用 `/api/check-status` 兜底轮询
+    - [ ] 设置 60 秒总超时（审核可能需要 30+ 秒）
+  - [ ] Pending status polling（每 3 秒轮询 `/api/check-status`）
+  - [x] Research error types (tested: "right click" error, "仅支持69或6a开头" error)
+  - [x] Research verificationId format requirements (24-char hex, 69/6a prefix)
+  - [x] **实测完整验证流程**（成功，耗时约 35 秒）
+  - [x] **实测重复验证**（失败，返回 `Verification already completed`，仍消耗配额）
+- [ ] Implement verification job management
+- [ ] Create daily statistics aggregation
+- [ ] Implement error code mapping and user-friendly messages
+- [ ] **卡密消耗时机**：仅 `success` 事件后消耗，`fail`/`error`/`timeout` 时回滚
+- [ ] **卡密绑定系统**：
+  - [ ] 成功后绑定卡密与 verificationId
+  - [ ] 本地去重检查（提交前查询数据库）
+  - [ ] 历史查询功能（用卡密查验证状态）
+- [ ] **并发与幂等**：verificationId 去重、任务去重、卡密锁原子一致
+
+## Phase 2: User Frontend
+- [ ] Design and implement main verification page
+  - [ ] SheerID link input (single/batch mode)
+  - [ ] Card key input (single/batch mode)
+  - [ ] Link-key pairing validation
+  - [ ] **前端即时验证** - verificationId 格式校验（24位十六进制，69/6a前缀）
+- [ ] Implement verification progress UI with real-time updates
+- [ ] Add result display with success/failure status
+- [ ] Show daily success count widget
+- [ ] Create help/guide modal with **critical user guidance**:
+  - [ ] "右键复制链接" 教程（含图示）
+  - [ ] 常见错误及解决方案
+
+## Phase 3: Admin Backend & Frontend
+- [ ] Implement admin authentication
+- [ ] Add rate limiting for admin login
+- [ ] Add session expiration policy for admin access
+- [ ] Create card key management page
+  - [ ] Generate single/batch keys
+  - [ ] Generate single/batch keys
+  - [ ] Search and filter keys
+  - [ ] Revoke/delete keys
+  - [ ] Export keys (CSV)
+- [ ] Implement real-time key status updates (SSE or polling)
+- [ ] Add audit logging for admin actions
+
+## Phase 4: Polish & Testing
+- [ ] End-to-end testing
+- [ ] Error handling improvements
+- [ ] UI/UX polish
+- [ ] Documentation
+
+## Phase 5: VPS Deployment
+- [ ] 创建 Dockerfile 和 docker-compose.yml
+- [ ] 配置 Nginx 反向代理（支持 SSE）
+- [ ] 配置 Cloudflare SSL（Full 模式）
+- [ ] 部署到 VPS (216.36.104.21)
+- [ ] 验证 https://91gemini.indevs.in 可访问
+- [ ] 配置 PM2 或 Docker 自动重启
