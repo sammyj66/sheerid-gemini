@@ -2,24 +2,25 @@
 
 :root {
   color-scheme: dark;
-  --bg: #05070d;
-  --bg-elevated: #0b1020;
-  --bg-card: rgba(12, 16, 30, 0.7);
-  --bg-card-solid: #0f1424;
-  --border: rgba(148, 163, 184, 0.2);
-  --border-strong: rgba(148, 163, 184, 0.35);
-  --text: #e2e8f0;
-  --muted: #94a3b8;
-  --muted-strong: #cbd5f5;
-  --accent: #7c8cff;
+  --bg: #070a1a;
+  --bg-elevated: #0b1028;
+  --bg-card: rgba(12, 16, 36, 0.8);
+  --bg-card-solid: #101636;
+  --border: rgba(255, 255, 255, 0.16);
+  --border-strong: rgba(255, 255, 255, 0.3);
+  --text: #f1f5ff;
+  --muted: #9aa5c9;
+  --muted-strong: #d7dfff;
+  --accent: #7c3aed;
   --accent-2: #22d3ee;
-  --success: #22c55e;
-  --warn: #f59e0b;
-  --error: #f97316;
-  --shadow: 0 24px 60px rgba(4, 8, 20, 0.6);
-  --radius-lg: 22px;
-  --radius-md: 14px;
-  --radius-sm: 10px;
+  --accent-3: #fb7185;
+  --success: #34d399;
+  --warn: #fbbf24;
+  --error: #fb7185;
+  --shadow: 0 26px 60px rgba(9, 14, 36, 0.65);
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
 }
 
 * {
@@ -30,35 +31,45 @@
 
 body {
   min-height: 100vh;
-  background: linear-gradient(135deg, #04060f 0%, #0a0f1f 40%, #111737 100%);
+  background: radial-gradient(circle at top, rgba(124, 58, 237, 0.18), transparent 45%),
+    radial-gradient(circle at 15% 80%, rgba(34, 211, 238, 0.2), transparent 50%),
+    linear-gradient(160deg, #070a1a 0%, #0b1028 55%, #141b3a 100%);
   color: var(--text);
   font-family: "Space Grotesk", "Segoe UI", sans-serif;
   position: relative;
   overflow-x: hidden;
 }
 
+.particle-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 body::before,
 body::after {
   content: "";
   position: absolute;
-  width: 520px;
-  height: 520px;
+  width: 560px;
+  height: 560px;
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.7;
+  filter: blur(140px);
+  opacity: 0.8;
   z-index: -1;
 }
 
 body::before {
-  top: -140px;
-  right: -120px;
-  background: radial-gradient(circle, rgba(124, 140, 255, 0.7), transparent 70%);
+  top: -160px;
+  right: -140px;
+  background: radial-gradient(circle, rgba(124, 58, 237, 0.7), transparent 70%);
 }
 
 body::after {
-  bottom: -200px;
-  left: -160px;
-  background: radial-gradient(circle, rgba(34, 211, 238, 0.55), transparent 70%);
+  bottom: -220px;
+  left: -180px;
+  background: radial-gradient(circle, rgba(251, 113, 133, 0.55), transparent 70%);
 }
 
 a {
@@ -73,6 +84,8 @@ button {
 .page {
   min-height: 100vh;
   padding: 48px 24px 96px;
+  position: relative;
+  z-index: 1;
 }
 
 .container {
@@ -80,6 +93,7 @@ button {
   margin: 0 auto;
   display: grid;
   gap: 24px;
+  width: 100%;
 }
 
 .header {
@@ -87,6 +101,32 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+.title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.4), rgba(34, 211, 238, 0.4));
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 22px rgba(124, 58, 237, 0.3);
+}
+
+.title-line {
+  width: 56px;
+  height: 4px;
+  margin: 10px 0 4px 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent-3));
+  box-shadow: 0 6px 16px rgba(124, 58, 237, 0.4);
 }
 
 .title {
@@ -103,8 +143,8 @@ button {
 }
 
 .help-button {
-  border: 1px solid var(--border);
-  background: rgba(12, 16, 30, 0.6);
+  border: 2px solid var(--border);
+  background: rgba(15, 20, 48, 0.65);
   color: var(--muted-strong);
   padding: 10px 16px;
   border-radius: 999px;
@@ -113,7 +153,7 @@ button {
 }
 
 .help-button:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-2);
   color: var(--text);
   transform: translateY(-1px);
 }
@@ -126,12 +166,32 @@ button {
 
 .card {
   background: var(--bg-card);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 24px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(16px);
   animation: fadeUp 0.6s ease both;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 28px 68px rgba(9, 14, 36, 0.7);
+}
+
+.sticker-card {
+  position: relative;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  background: linear-gradient(160deg, rgba(124, 58, 237, 0.12), rgba(34, 211, 238, 0.08)),
+    var(--bg-card);
+  box-shadow:
+    0 18px 40px rgba(9, 14, 36, 0.55),
+    0 6px 0 rgba(124, 58, 237, 0.12);
+}
+
+.sticker-card::after {
+  content: none;
 }
 
 .card-header {
@@ -157,11 +217,86 @@ button {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
 
+.bento-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.bento-card {
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  box-shadow: 0 18px 40px rgba(11, 16, 40, 0.45);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 22px 44px rgba(11, 16, 40, 0.6);
+}
+
+.bento-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 20px;
+}
+
+.bento-label {
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.bento-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.bento-unit {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.bento-success {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.35), rgba(34, 211, 238, 0.15));
+}
+
+.bento-fail {
+  background: linear-gradient(135deg, rgba(251, 113, 133, 0.35), rgba(124, 58, 237, 0.2));
+}
+
+.bento-total {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(34, 211, 238, 0.2));
+}
+
+.bento-warn {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.35), rgba(124, 58, 237, 0.2));
+}
+
+.bento-info {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.35), rgba(124, 58, 237, 0.2));
+}
+
+.bento-muted {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.25), rgba(94, 234, 212, 0.15));
+}
+
 .stat {
   background: var(--bg-card-solid);
   border-radius: var(--radius-md);
   padding: 16px;
-  border: 1px solid transparent;
+  border: 2px solid transparent;
   transition: all 0.2s ease;
 }
 
@@ -189,26 +324,50 @@ button {
 }
 
 .mode-toggle {
-  display: inline-flex;
-  gap: 8px;
-  padding: 6px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid var(--border);
+  background: rgba(12, 18, 40, 0.85);
+  border: 2px solid var(--border);
+  overflow: hidden;
+}
+
+.mode-slider {
+  position: absolute;
+  pointer-events: none;
+  inset: 4px auto 4px 4px;
+  width: calc(50% - 4px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(34, 211, 238, 0.35));
+  box-shadow: 0 8px 20px rgba(124, 58, 237, 0.25);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mode-toggle.single .mode-slider {
+  transform: translateX(0);
+}
+
+.mode-toggle.batch .mode-slider {
+  transform: translateX(100%);
 }
 
 .mode-button {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
   border: none;
   background: transparent;
   color: var(--muted);
-  padding: 8px 14px;
+  padding: 8px 18px;
   border-radius: 999px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .mode-button.active {
-  background: rgba(124, 140, 255, 0.2);
   color: var(--text);
 }
 
@@ -226,13 +385,13 @@ button {
 .input {
   width: 100%;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   padding: 12px 14px;
-  background: rgba(6, 10, 20, 0.8);
+  background: rgba(7, 12, 28, 0.85);
   color: var(--text);
   font-size: 14px;
   font-family: "Space Grotesk", sans-serif;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 
 .textarea {
@@ -243,8 +402,11 @@ button {
 .textarea:focus,
 .input:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124, 140, 255, 0.2);
+  border-color: transparent;
+  background:
+    linear-gradient(rgba(7, 12, 28, 0.95), rgba(7, 12, 28, 0.95)) padding-box,
+    linear-gradient(135deg, var(--accent), var(--accent-2), var(--accent-3)) border-box;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25), 0 0 18px rgba(34, 211, 238, 0.25);
 }
 
 .helper {
@@ -273,29 +435,101 @@ button {
 }
 
 .primary-button {
+  position: relative;
+  overflow: hidden;
   border: none;
   border-radius: 999px;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #5b6bff, #22d3ee);
+  background: linear-gradient(120deg, #7c3aed, #22d3ee, #fb7185);
+  background-size: 200% 200%;
   color: #0b1020;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 14px 32px rgba(124, 58, 237, 0.25);
+  animation: gradientShift 6s ease infinite, pulseGlow 3.5s ease-in-out infinite;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.primary-button::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  left: -60%;
+  width: 60%;
+  height: 140%;
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  transform: skewX(-20deg);
+  opacity: 0;
+  transition: opacity 0.2s ease, transform 0.6s ease;
 }
 
 .primary-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  animation: none;
 }
 
 .primary-button:not(:disabled):hover {
   transform: translateY(-1px);
-  box-shadow: 0 12px 30px rgba(34, 211, 238, 0.3);
+  box-shadow: 0 18px 38px rgba(124, 58, 237, 0.35);
+}
+
+.primary-button:not(:disabled):hover::after {
+  opacity: 1;
+  transform: translateX(220%) skewX(-20deg);
+}
+
+.loading-dots {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.loading-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(11, 16, 32, 0.7);
+  animation: dotPulse 1s ease-in-out infinite;
+}
+
+.loading-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.loading-dots span:nth-child(3) {
+  animation-delay: 0.4s;
 }
 
 .progress-wrapper {
   display: grid;
   gap: 16px;
+}
+
+.progress-empty {
+  display: grid;
+  gap: 12px;
+}
+
+.progress-placeholder {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 2px dashed rgba(255, 255, 255, 0.18);
+  background: rgba(14, 20, 42, 0.6);
+}
+
+.placeholder-bar {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(124, 58, 237, 0.3), rgba(34, 211, 238, 0.2), rgba(251, 113, 133, 0.3));
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+.placeholder-bar.short {
+  width: 60%;
 }
 
 .progress-bar {
@@ -319,7 +553,7 @@ button {
 
 .progress-item {
   background: rgba(8, 12, 24, 0.85);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   border-radius: var(--radius-md);
   padding: 16px;
   display: grid;
@@ -390,7 +624,7 @@ button {
 }
 
 .copy-button {
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   background: transparent;
   color: var(--text);
   padding: 6px 12px;
@@ -403,7 +637,7 @@ button {
   font-size: 12px;
   border-radius: 999px;
   padding: 4px 10px;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   color: var(--muted-strong);
 }
 
@@ -421,7 +655,7 @@ button {
 .modal {
   background: #0b1020;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-strong);
+  border: 2px solid var(--border-strong);
   max-width: 860px;
   width: 100%;
   padding: 28px;
@@ -536,7 +770,7 @@ button {
 .data-table-row {
   padding: 12px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   background: rgba(10, 14, 26, 0.9);
 }
 
@@ -544,7 +778,7 @@ button {
   margin-top: 8px;
   padding: 12px;
   border-radius: var(--radius-md);
-  border: 1px dashed var(--border);
+  border: 2px dashed var(--border);
   color: var(--muted);
   font-size: 13px;
   display: grid;
@@ -558,7 +792,7 @@ button {
 }
 
 .ghost-button {
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
   background: transparent;
   color: var(--text);
   padding: 8px 14px;
@@ -569,7 +803,7 @@ button {
 }
 
 .ghost-button:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-2);
 }
 
 .ghost-button.danger {
@@ -595,7 +829,7 @@ button {
   background: rgba(8, 12, 24, 0.8);
   border-radius: var(--radius-md);
   padding: 16px;
-  border: 1px solid var(--border);
+  border: 2px solid var(--border);
 }
 
 .generated-list {
@@ -606,7 +840,7 @@ button {
 
 .key-chip {
   background: rgba(124, 140, 255, 0.16);
-  border: 1px solid rgba(124, 140, 255, 0.4);
+  border: 2px solid rgba(124, 140, 255, 0.4);
   border-radius: 999px;
   padding: 6px 12px;
   font-size: 12px;
@@ -621,6 +855,7 @@ button {
 }
 
 @media (max-width: 980px) {
+
   .data-table-head,
   .data-table-row {
     grid-template-columns: 1fr;
@@ -637,9 +872,63 @@ button {
     opacity: 0;
     transform: translateY(16px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 14px 32px rgba(124, 58, 237, 0.25);
+  }
+
+  50% {
+    box-shadow: 0 18px 44px rgba(34, 211, 238, 0.35);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
   }
 }
 
@@ -655,5 +944,19 @@ button {
 
   .card {
     padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .primary-button {
+    animation: none !important;
   }
 }

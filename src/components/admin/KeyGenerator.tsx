@@ -124,7 +124,11 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
         />
       </div>
 
-      {error && <div className="error-list">{error}</div>}
+      {error && (
+        <div className="error-list" role="status" aria-live="polite">
+          {error}
+        </div>
+      )}
 
       <button
         type="button"
@@ -132,7 +136,18 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
         disabled={loading}
         onClick={handleGenerate}
       >
-        {loading ? "生成中..." : "生成卡密"}
+        {loading ? (
+          <>
+            生成中
+            <span className="loading-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </>
+        ) : (
+          "生成卡密"
+        )}
       </button>
 
       {generated.length > 0 && (

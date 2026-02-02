@@ -170,7 +170,11 @@ export default function KeyTable({
         </div>
       </div>
 
-      {error && <div className="error-list">{error}</div>}
+      {error && (
+        <div className="error-list" role="status" aria-live="polite">
+          {error}
+        </div>
+      )}
 
       <div className="data-table">
         <div className="data-table-head">

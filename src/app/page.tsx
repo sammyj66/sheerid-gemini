@@ -220,12 +220,20 @@ export default function Home() {
       <div className="container">
         <header className="header">
           <div>
-            <h1 className="title">Gemini 学生认证平台</h1>
+            <div className="title-row">
+              <span className="title-badge">✨</span>
+              <h1 className="title">Gemini 学生认证平台</h1>
+            </div>
+            <div className="title-line" />
             <p className="subtitle">
               使用卡密激活 SheerID 学生验证，实时查看进度并获取验证结果。
             </p>
           </div>
-          <button className="help-button" onClick={() => setHelpOpen(true)}>
+          <button
+            className="help-button"
+            onClick={() => setHelpOpen(true)}
+            aria-label="打开帮助"
+          >
             帮助
           </button>
         </header>
@@ -235,14 +243,18 @@ export default function Home() {
         </section>
 
         <section className="grid-two">
-          <div className="card">
+          <div className="card sticker-card">
             <VerificationForm
               isSubmitting={isSubmitting}
               onSubmit={handleSubmit}
             />
           </div>
           <div className="card">
-            {globalError && <div className="error-list">{globalError}</div>}
+            {globalError && (
+              <div className="error-list" role="status" aria-live="polite">
+                {globalError}
+              </div>
+            )}
             <VerificationProgress items={items} />
           </div>
         </section>

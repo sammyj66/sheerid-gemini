@@ -1,4 +1,5 @@
 import "./globals.css";
+import ParticleBackground from "@/components/ParticleBackground";
 
 export const metadata = {
   title: "Gemini 学生认证平台",
@@ -8,7 +9,10 @@ export const metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>
+        <ParticleBackground />
+        {children}
+      </body>
     </html>
   );
 }

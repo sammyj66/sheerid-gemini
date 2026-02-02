@@ -95,7 +95,14 @@ export default function VerificationProgress({
       </div>
 
       {items.length === 0 ? (
-        <div className="card-note">提交后会在此显示实时进度。</div>
+        <div className="progress-empty">
+          <div className="progress-placeholder">
+            <div className="placeholder-bar" />
+            <div className="placeholder-bar short" />
+            <div className="placeholder-bar" />
+          </div>
+          <div className="card-note">提交后会在此显示实时进度。</div>
+        </div>
       ) : (
         <div className="progress-list">
           {items.map((item) => {

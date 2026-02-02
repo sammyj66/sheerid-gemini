@@ -99,10 +99,12 @@ export default function VerificationForm({
           <div className="card-title">提交验证</div>
           <div className="card-note">{helperText}</div>
         </div>
-        <div className="mode-toggle" role="tablist">
+        <div className={`mode-toggle ${mode}`} role="tablist">
+          <span className="mode-slider" />
           <button
             type="button"
             className={`mode-button ${mode === "single" ? "active" : ""}`}
+            aria-pressed={mode === "single"}
             onClick={() => setMode("single")}
           >
             单条
@@ -110,6 +112,7 @@ export default function VerificationForm({
           <button
             type="button"
             className={`mode-button ${mode === "batch" ? "active" : ""}`}
+            aria-pressed={mode === "batch"}
             onClick={() => setMode("batch")}
           >
             批量
@@ -144,7 +147,7 @@ export default function VerificationForm({
       </div>
 
       {(validation.issues.length > 0 || validation.countMismatch) && (
-        <div className="error-list">
+        <div className="error-list" role="status" aria-live="polite">
           {validation.countMismatch && (
             <div>链接数量必须与卡密数量一致</div>
           )}
@@ -162,7 +165,18 @@ export default function VerificationForm({
         type="submit"
         disabled={!validation.canSubmit || isSubmitting}
       >
-        {isSubmitting ? "验证进行中..." : "开始验证"}
+        {isSubmitting ? (
+          <>
+            验证进行中
+            <span className="loading-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          </>
+        ) : (
+          "开始验证"
+        )}
       </button>
     </form>
   );

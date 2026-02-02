@@ -34,18 +34,30 @@ export default function StatsWidget({ refreshToken }: StatsWidgetProps) {
           <div className="card-note">每 30 秒自动刷新</div>
         </div>
       </div>
-      <div className="stats-grid">
-        <div className="stat">
-          <div className="stat-label">成功</div>
-          <div className="stat-value">{data?.todaySuccess ?? 0}</div>
+      <div className="bento-grid">
+        <div className="bento-card bento-success">
+          <div className="bento-icon">✨</div>
+          <div>
+            <div className="bento-label">成功</div>
+            <div className="bento-value">{data?.todaySuccess ?? 0}</div>
+          </div>
+          <div className="bento-unit">次</div>
         </div>
-        <div className="stat">
-          <div className="stat-label">失败</div>
-          <div className="stat-value">{data?.todayFail ?? 0}</div>
+        <div className="bento-card bento-fail">
+          <div className="bento-icon">💥</div>
+          <div>
+            <div className="bento-label">失败</div>
+            <div className="bento-value">{data?.todayFail ?? 0}</div>
+          </div>
+          <div className="bento-unit">次</div>
         </div>
-        <div className="stat">
-          <div className="stat-label">总计</div>
-          <div className="stat-value">{data?.todayTotal ?? 0}</div>
+        <div className="bento-card bento-total">
+          <div className="bento-icon">📦</div>
+          <div>
+            <div className="bento-label">总计</div>
+            <div className="bento-value">{data?.todayTotal ?? 0}</div>
+          </div>
+          <div className="bento-unit">次</div>
         </div>
       </div>
     </div>

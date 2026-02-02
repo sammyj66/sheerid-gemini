@@ -55,13 +55,17 @@ export default function AdminDashboardPage() {
       <div className="container admin-container">
         <header className="header">
           <div>
-            <h1 className="title">管理员控制台</h1>
+            <div className="title-row">
+              <span className="title-badge">🛠️</span>
+              <h1 className="title">管理员控制台</h1>
+            </div>
+            <div className="title-line" />
             <p className="subtitle">卡密管理、导出、审计日志一站式操作。</p>
           </div>
         </header>
 
         <section className="grid-two">
-          <div className="card">
+          <div className="card sticker-card">
             <KeyGenerator onGenerated={handleUpdated} />
           </div>
           <div className="card">
@@ -71,30 +75,54 @@ export default function AdminDashboardPage() {
                 <div className="card-note">当前筛选条件统计</div>
               </div>
             </div>
-            <div className="stats-grid">
-              <div className="stat">
-                <div className="stat-label">总数</div>
-                <div className="stat-value">{stats?.total ?? 0}</div>
+            <div className="bento-grid">
+              <div className="bento-card bento-total">
+                <div className="bento-icon">📦</div>
+                <div>
+                  <div className="bento-label">总数</div>
+                  <div className="bento-value">{stats?.total ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
-              <div className="stat">
-                <div className="stat-label">未使用</div>
-                <div className="stat-value">{stats?.unused ?? 0}</div>
+              <div className="bento-card bento-success">
+                <div className="bento-icon">💡</div>
+                <div>
+                  <div className="bento-label">未使用</div>
+                  <div className="bento-value">{stats?.unused ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
-              <div className="stat">
-                <div className="stat-label">已锁定</div>
-                <div className="stat-value">{stats?.locked ?? 0}</div>
+              <div className="bento-card bento-warn">
+                <div className="bento-icon">🔒</div>
+                <div>
+                  <div className="bento-label">已锁定</div>
+                  <div className="bento-value">{stats?.locked ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
-              <div className="stat">
-                <div className="stat-label">已消耗</div>
-                <div className="stat-value">{stats?.consumed ?? 0}</div>
+              <div className="bento-card bento-info">
+                <div className="bento-icon">⚡</div>
+                <div>
+                  <div className="bento-label">已消耗</div>
+                  <div className="bento-value">{stats?.consumed ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
-              <div className="stat">
-                <div className="stat-label">已作废</div>
-                <div className="stat-value">{stats?.revoked ?? 0}</div>
+              <div className="bento-card bento-fail">
+                <div className="bento-icon">🧯</div>
+                <div>
+                  <div className="bento-label">已作废</div>
+                  <div className="bento-value">{stats?.revoked ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
-              <div className="stat">
-                <div className="stat-label">已过期</div>
-                <div className="stat-value">{stats?.expired ?? 0}</div>
+              <div className="bento-card bento-muted">
+                <div className="bento-icon">🕰️</div>
+                <div>
+                  <div className="bento-label">已过期</div>
+                  <div className="bento-value">{stats?.expired ?? 0}</div>
+                </div>
+                <div className="bento-unit">枚</div>
               </div>
             </div>
             <div className="toolbar">

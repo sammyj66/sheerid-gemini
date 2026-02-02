@@ -47,7 +47,10 @@ export default function AdminLoginPage() {
         <div className="card admin-login-card">
           <div className="card-header">
             <div>
-              <div className="card-title">管理员登录</div>
+              <div className="title-row">
+                <span className="title-badge">🔐</span>
+                <div className="card-title">管理员登录</div>
+              </div>
               <div className="card-note">请输入管理员密码</div>
             </div>
           </div>
@@ -58,15 +61,31 @@ export default function AdminLoginPage() {
               <input
                 className="input"
                 type="password"
+                autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
             </div>
 
-            {error && <div className="error-list">{error}</div>}
+            {error && (
+              <div className="error-list" role="status" aria-live="polite">
+                {error}
+              </div>
+            )}
 
             <button className="primary-button" type="submit" disabled={loading}>
-              {loading ? "登录中..." : "登录"}
+              {loading ? (
+                <>
+                  登录中
+                  <span className="loading-dots" aria-hidden="true">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                </>
+              ) : (
+                "登录"
+              )}
             </button>
           </form>
         </div>
