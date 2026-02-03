@@ -34,11 +34,19 @@ export async function POST(request: Request) {
     return Response.json({ found: false });
   }
 
+  const cardKeyData = await prisma.cardKey.findUnique({
+    where: { code: job.cardKeyCode },
+  });
+
   return Response.json({
     found: true,
     status: job.status,
     resultUrl: job.resultUrl,
     verifiedAt: job.finishedAt,
     cardKeyCode: job.cardKeyCode,
+    maxUses: cardKeyData?.maxUses,
+    usedCount: cardKeyData?.usedCount,
+    remainingUses:
+      cardKeyData ? cardKeyData.maxUses - cardKeyData.usedCount : undefined,
   });
 }
