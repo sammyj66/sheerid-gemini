@@ -54,8 +54,12 @@ function getKeyBadge(status: VerificationStatus, keyStatus?: VerificationProgres
 
 export default function VerificationProgress({
   items,
+  remainingUses,
+  remainingLabel,
 }: {
   items: VerificationProgressItem[];
+  remainingUses?: number | null;
+  remainingLabel?: string | null;
 }) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
@@ -90,6 +94,12 @@ export default function VerificationProgress({
           <div className="card-note">
             已完成 {completedCount}/{items.length}
           </div>
+          {remainingLabel && (
+            <div className="card-note">卡密剩余次数: {remainingLabel}</div>
+          )}
+          {!remainingLabel && typeof remainingUses === "number" && (
+            <div className="card-note">卡密剩余次数: {remainingUses} 次</div>
+          )}
         </div>
         <div className="progress-meta">{percent}%</div>
       </div>

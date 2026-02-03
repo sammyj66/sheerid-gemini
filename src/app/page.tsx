@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import HelpModal from "@/components/HelpModal";
 import StatsWidget from "@/components/StatsWidget";
 import VerificationForm, {
@@ -42,6 +42,9 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [globalError, setGlobalError] = useState<string | null>(null);
+  const [remainingUses, setRemainingUses] = useState<number | null>(null);
+  const [remainingLabel, setRemainingLabel] = useState<string | null>(null);
+  const remainingKeyRef = useRef<string | null>(null);
 
   const updateItem = useCallback(
     (index: number, patch: Partial<VerificationProgressItem>) => {
@@ -81,6 +84,7 @@ export default function Home() {
           keyStatus: payload.skipConsume ? "unused" : "consumed",
         });
         setRefreshToken((prev) => prev + 1);
+        refreshRemainingUses();
         return;
       }
 
@@ -90,6 +94,7 @@ export default function Home() {
           message: payload.message as string | undefined,
         });
         setRefreshToken((prev) => prev + 1);
+        refreshRemainingUses();
         return;
       }
 
@@ -104,10 +109,70 @@ export default function Home() {
         });
         if (completedStatuses.has(status)) {
           setRefreshToken((prev) => prev + 1);
+          refreshRemainingUses();
         }
       }
     },
-    [updateItem]
+    [refreshRemainingUses, updateItem]
+  );
+
+  const queryRemainingUses = useCallback(async (cardKey: string) => {
+    setRemainingLabel("查询中...");
+    try {
+      const response = await fetch("/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardKey }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.found) {
+        setRemainingUses(null);
+        setRemainingLabel("未查询到");
+        return;
+      }
+      const remaining =
+        typeof data.remainingUses === "number"
+          ? data.remainingUses
+          : typeof data.maxUses === "number" && typeof data.usedCount === "number"
+            ? data.maxUses - data.usedCount
+            : null;
+      if (typeof remaining === "number") {
+        setRemainingUses(remaining);
+        setRemainingLabel(`${remaining} 次`);
+      } else {
+        setRemainingUses(null);
+        setRemainingLabel("未查询到");
+      }
+    } catch {
+      setRemainingUses(null);
+      setRemainingLabel("未查询到");
+    }
+  }, []);
+
+  const refreshRemainingUses = useCallback(() => {
+    const key = remainingKeyRef.current;
+    if (!key) {
+      setRemainingUses(null);
+      setRemainingLabel(null);
+      return;
+    }
+    void queryRemainingUses(key);
+  }, [queryRemainingUses]);
+
+  const startRemainingTracking = useCallback(
+    (cardKeys: string[]) => {
+      const normalized = cardKeys.map((key) => key.trim()).filter(Boolean);
+      const uniqueKeys = Array.from(new Set(normalized));
+      if (uniqueKeys.length === 1) {
+        remainingKeyRef.current = uniqueKeys[0];
+        refreshRemainingUses();
+      } else {
+        remainingKeyRef.current = null;
+        setRemainingUses(null);
+        setRemainingLabel(null);
+      }
+    },
+    [refreshRemainingUses]
   );
 
   const parseSSE = useCallback(
@@ -172,6 +237,7 @@ export default function Home() {
   const handleSubmit = async (payload: VerificationFormPayload) => {
     setGlobalError(null);
     setIsSubmitting(true);
+    startRemainingTracking(payload.cardKeys);
 
     setItems(
       payload.links.map((link, index) => ({
@@ -216,6 +282,7 @@ export default function Home() {
     } finally {
       setIsSubmitting(false);
       setRefreshToken((prev) => prev + 1);
+      refreshRemainingUses();
     }
   };
 
@@ -259,7 +326,11 @@ export default function Home() {
                 {globalError}
               </div>
             )}
-            <VerificationProgress items={items} />
+            <VerificationProgress
+              items={items}
+              remainingUses={remainingUses}
+              remainingLabel={remainingLabel}
+            />
           </div>
         </section>
       </div>

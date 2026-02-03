@@ -22,35 +22,36 @@ export async function POST(request: Request) {
     );
   }
 
-  if (cardKey && !verificationId) {
-    const cardKeyData = await prisma.cardKey.findUnique({
-      where: { code: cardKey },
-    });
-    return Response.json({ found: Boolean(cardKeyData) });
-  }
+  let cardKeyData = cardKey
+    ? await prisma.cardKey.findUnique({ where: { code: cardKey } })
+    : null;
 
-  const job = await prisma.verificationJob.findFirst({
-    where: {
-      ...(cardKey ? { cardKeyCode: cardKey } : {}),
-      ...(verificationId ? { verificationId } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const job = verificationId
+    ? await prisma.verificationJob.findFirst({
+        where: {
+          ...(cardKey ? { cardKeyCode: cardKey } : {}),
+          ...(verificationId ? { verificationId } : {}),
+        },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
 
-  if (!job) {
+  if (!job && !cardKeyData) {
     return Response.json({ found: false });
   }
 
-  const cardKeyData = await prisma.cardKey.findUnique({
-    where: { code: job.cardKeyCode },
-  });
+  if (job && !cardKeyData) {
+    cardKeyData = await prisma.cardKey.findUnique({
+      where: { code: job.cardKeyCode },
+    });
+  }
 
   return Response.json({
     found: true,
-    status: job.status,
-    resultUrl: job.resultUrl,
-    verifiedAt: job.finishedAt,
-    cardKeyCode: job.cardKeyCode,
+    status: job?.status ?? cardKeyData?.status,
+    resultUrl: job?.resultUrl ?? null,
+    verifiedAt: job?.finishedAt ?? null,
+    cardKeyCode: job?.cardKeyCode ?? cardKeyData?.code ?? null,
     maxUses: cardKeyData?.maxUses,
     usedCount: cardKeyData?.usedCount,
     remainingUses:
