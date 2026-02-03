@@ -76,6 +76,8 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     view_logs: "查看日志",
     clear_logs: "清空日志",
     update_cardkey_uses: "修改验证次数",
+    update_cardkey_expires: "修改过期时间",
+    update_cardkey_code: "修改卡密",
     login_success: "登录成功",
     login_failed: "登录失败",
     login_rate_limited: "登录限流",
@@ -149,6 +151,14 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     if (action === "update_cardkey_uses") {
       const pairs = parseDetailPairs(detail);
       return `卡密=${pairs.code || "-"} 次数=${pairs.maxUses || "-"}`;
+    }
+    if (action === "update_cardkey_expires") {
+      const pairs = parseDetailPairs(detail);
+      return `卡密=${pairs.code || "-"} 过期=${pairs.expiresAt || "-"}`;
+    }
+    if (action === "update_cardkey_code") {
+      const pairs = parseDetailPairs(detail);
+      return `卡密=${pairs.code || "-"} 改为 ${pairs.newCode || "-"}`;
     }
     return detail;
   };

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type { FocusEvent, KeyboardEvent } from "react";
 
 type MaskedDateInputProps = {
   value: string;
@@ -9,6 +10,8 @@ type MaskedDateInputProps = {
   className?: string;
   disabled?: boolean;
   name?: string;
+  onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
 
 const MAX_DIGITS = 12; // YYYYMMDDHHmm
@@ -39,6 +42,8 @@ export default function MaskedDateInput({
   className,
   disabled,
   name,
+  onBlur,
+  onKeyDown,
 }: MaskedDateInputProps) {
   const formatted = useMemo(() => formatDigits(extractDigits(value)), [value]);
 
@@ -52,6 +57,8 @@ export default function MaskedDateInput({
       disabled={disabled}
       value={formatted}
       onKeyDown={(event) => {
+        onKeyDown?.(event);
+        if (event.defaultPrevented) return;
         if (event.key !== "Backspace") return;
         const { selectionStart, selectionEnd } = event.currentTarget;
         if (
@@ -70,6 +77,7 @@ export default function MaskedDateInput({
         const digits = extractDigits(event.target.value);
         onChange(formatDigits(digits));
       }}
+      onBlur={onBlur}
     />
   );
 }

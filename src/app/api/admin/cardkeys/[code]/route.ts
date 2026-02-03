@@ -50,7 +50,7 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   const { code } = await context.params;
-  let payload: { action?: string; maxUses?: number } = {};
+  let payload: { action?: string; maxUses?: number; newCode?: string; expiresAt?: string | null } = {};
 
   try {
     payload = (await request.json()) as typeof payload;
@@ -61,7 +61,9 @@ export async function PATCH(request: Request, context: Context) {
   if (
     payload.action !== "revoke" &&
     payload.action !== "restore" &&
-    payload.action !== "set_uses"
+    payload.action !== "set_uses" &&
+    payload.action !== "set_expires" &&
+    payload.action !== "set_code"
   ) {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   }
@@ -152,6 +154,76 @@ export async function PATCH(request: Request, context: Context) {
     await logAdminAction({
       action: "update_cardkey_uses",
       detail: `code=${code} maxUses=${maxUses} usedCount=${nextUsedCount}`,
+      ip: getClientIp(request.headers),
+    });
+
+    return NextResponse.json({ success: true, cardKey: updated });
+  }
+
+  if (payload.action === "set_expires") {
+    let expiresAt: Date | null = null;
+    if (payload.expiresAt) {
+      const parsed = new Date(payload.expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: "expiresAt 格式错误" }, { status: 400 });
+      }
+      expiresAt = parsed;
+    }
+
+    const updated = await prisma.cardKey.update({
+      where: { code },
+      data: { expiresAt },
+    });
+
+    await logAdminAction({
+      action: "update_cardkey_expires",
+      detail: `code=${code} expiresAt=${expiresAt ? expiresAt.toISOString() : ""}`,
+      ip: getClientIp(request.headers),
+    });
+
+    return NextResponse.json({ success: true, cardKey: updated });
+  }
+
+  if (payload.action === "set_code") {
+    const newCode = String(payload.newCode || "").trim();
+    if (!newCode) {
+      return NextResponse.json({ error: "卡密不能为空" }, { status: 400 });
+    }
+    if (newCode === code) {
+      return NextResponse.json({ success: true });
+    }
+
+    const cardKey = await prisma.cardKey.findUnique({ where: { code } });
+    if (!cardKey) {
+      return NextResponse.json({ error: "卡密不存在" }, { status: 404 });
+    }
+    if (cardKey.status === "LOCKED") {
+      return NextResponse.json({ error: "卡密正在使用中" }, { status: 409 });
+    }
+
+    const existing = await prisma.cardKey.findUnique({ where: { code: newCode } });
+    if (existing) {
+      return NextResponse.json({ error: "卡密已存在" }, { status: 409 });
+    }
+
+    const jobCount = await prisma.verificationJob.count({
+      where: { cardKeyCode: code },
+    });
+    if (jobCount > 0) {
+      return NextResponse.json(
+        { error: "该卡密已有验证记录，无法修改" },
+        { status: 409 }
+      );
+    }
+
+    const updated = await prisma.cardKey.update({
+      where: { code },
+      data: { code: newCode },
+    });
+
+    await logAdminAction({
+      action: "update_cardkey_code",
+      detail: `code=${code} newCode=${newCode}`,
       ip: getClientIp(request.headers),
     });
 

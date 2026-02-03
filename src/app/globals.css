@@ -762,6 +762,7 @@ a.progress-link:hover {
     minmax(160px, 1.3fr)
     minmax(120px, 0.8fr)
     minmax(110px, 0.7fr)
+    minmax(160px, 1fr)
     minmax(120px, 0.8fr)
     minmax(160px, 1fr)
     minmax(200px, 1fr);
@@ -867,6 +868,33 @@ a.progress-link:hover {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.inline-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.editable-cell {
+  cursor: pointer;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.35);
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.editable-cell:hover {
+  color: var(--text);
+  border-color: rgba(34, 211, 238, 0.6);
+}
+
+.ghost-button--tiny {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.muted-text {
+  color: var(--muted);
 }
 
 .copy-hint {

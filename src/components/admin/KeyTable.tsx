@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
+import MaskedDateInput from "./MaskedDateInput";
 
 type CardKey = {
   code: string;
@@ -25,6 +27,8 @@ type KeyTableProps = {
   refreshToken: number;
   onUpdated: () => void;
 };
+
+type EditField = "code" | "maxUses" | "expiresAt";
 
 const statusOptions = [
   { value: "ALL", label: "全部" },
@@ -52,6 +56,31 @@ const statusLabelMap: Record<string, string> = {
   EXPIRED: "已过期",
 };
 
+function formatLocalDateTime(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (num: number) => String(num).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function parseDateTimeInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = trimmed.includes("T")
+    ? trimmed
+    : trimmed.includes(" ")
+      ? trimmed.replace(" ", "T")
+      : `${trimmed}T00:00`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new Error("过期时间格式错误，请使用 YYYY-MM-DD HH:mm");
+  }
+  return parsed.toISOString();
+}
+
 export default function KeyTable({
   filters,
   onFiltersChange,
@@ -65,10 +94,11 @@ export default function KeyTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
-  const [editingCode, setEditingCode] = useState<string | null>(null);
-  const [editMaxUses, setEditMaxUses] = useState(1);
+  const [editing, setEditing] = useState<{ code: string; field: EditField } | null>(null);
+  const [editValue, setEditValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
+  const skipBlurRef = useRef(false);
 
   const totalPages = Math.max(1, Math.ceil(total / filters.limit));
 
@@ -378,50 +408,122 @@ export default function KeyTable({
     }
   };
 
-  const handleEditUses = (item: CardKey) => {
-    setEditingCode(item.code);
-    setEditMaxUses(item.maxUses ?? 1);
+  const startEdit = (item: CardKey, field: EditField) => {
+    setEditing({ code: item.code, field });
     setEditError(null);
+    if (field === "code") {
+      setEditValue(item.code);
+    } else if (field === "maxUses") {
+      setEditValue(String(item.maxUses ?? 1));
+    } else {
+      setEditValue(formatLocalDateTime(item.expiresAt));
+    }
   };
 
-  const handleSaveUses = async (code: string) => {
-    const nextMaxUses = Number(editMaxUses);
-    if (!Number.isInteger(nextMaxUses) || nextMaxUses < 1 || nextMaxUses > 1000) {
-      setEditError("可验证次数必须为 1-1000 的整数");
-      return;
-    }
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditError(null);
+    setEditValue("");
+  };
 
-    const prevItems = items;
+  const applyUpdatedCardKey = (prevCode: string, updated?: CardKey) => {
+    if (!updated) return;
     setItems((prev) =>
-      prev.map((item) =>
-        item.code === code
-          ? {
-              ...item,
-              maxUses: nextMaxUses,
-              usedCount: Math.min(item.usedCount ?? 0, nextMaxUses),
-            }
-          : item
-      )
+      prev.map((item) => (item.code === prevCode ? updated : item))
     );
+    setSelectedCodes((prev) =>
+      prev.map((code) => (code === prevCode ? updated.code : code))
+    );
+    setExpanded((prev) => (prev === prevCode ? updated.code : prev));
+  };
 
+  const saveEdit = async (item: CardKey) => {
+    if (!editing) return;
+    const field = editing.field;
+    const prevItems = items;
     try {
-      const response = await fetch(`/api/admin/cardkeys/${code}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ action: "set_uses", maxUses: nextMaxUses }),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error((data as { error?: string })?.error || "更新失败");
+      if (field === "code") {
+        const newCode = editValue.trim();
+        if (!newCode) {
+          throw new Error("卡密不能为空");
+        }
+        if (newCode === item.code) {
+          cancelEdit();
+          return;
+        }
+        const response = await fetch(`/api/admin/cardkeys/${item.code}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "set_code", newCode }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error((data as { error?: string })?.error || "更新失败");
+        }
+        if (data?.cardKey) {
+          applyUpdatedCardKey(item.code, data.cardKey as CardKey);
+        } else {
+          setItems((prev) =>
+            prev.map((row) =>
+              row.code === item.code ? { ...row, code: newCode } : row
+            )
+          );
+        }
       }
-      if (data?.cardKey) {
+
+      if (field === "maxUses") {
+        const nextMaxUses = Number(editValue);
+        if (
+          !Number.isInteger(nextMaxUses) ||
+          nextMaxUses < 1 ||
+          nextMaxUses > 1000
+        ) {
+          throw new Error("可验证次数必须为 1-1000 的整数");
+        }
         setItems((prev) =>
-          prev.map((item) => (item.code === code ? data.cardKey : item))
+          prev.map((row) =>
+            row.code === item.code
+              ? {
+                  ...row,
+                  maxUses: nextMaxUses,
+                  usedCount: Math.min(row.usedCount ?? 0, nextMaxUses),
+                }
+              : row
+          )
         );
+        const response = await fetch(`/api/admin/cardkeys/${item.code}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ action: "set_uses", maxUses: nextMaxUses }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error((data as { error?: string })?.error || "更新失败");
+        }
+        applyUpdatedCardKey(item.code, data.cardKey as CardKey);
       }
-      setEditingCode(null);
-      setEditError(null);
+
+      if (field === "expiresAt") {
+        const nextExpiresAt = parseDateTimeInput(editValue);
+        const response = await fetch(`/api/admin/cardkeys/${item.code}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            action: "set_expires",
+            expiresAt: nextExpiresAt,
+          }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error((data as { error?: string })?.error || "更新失败");
+        }
+        applyUpdatedCardKey(item.code, data.cardKey as CardKey);
+      }
+
+      cancelEdit();
       onUpdated();
     } catch (err) {
       setItems(prevItems);
@@ -429,10 +531,32 @@ export default function KeyTable({
     }
   };
 
-  const handleCancelEdit = () => {
-    setEditingCode(null);
-    setEditError(null);
+  const handleEditKeyDown = (event: KeyboardEvent<HTMLInputElement>, item: CardKey) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      skipBlurRef.current = true;
+      void saveEdit(item);
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      skipBlurRef.current = true;
+      cancelEdit();
+    }
   };
+
+  const handleEditBlur = (item: CardKey) => {
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
+    if (!editing || editing.code !== item.code) {
+      return;
+    }
+    void saveEdit(item);
+  };
+
+  const isEditingField = (item: CardKey, field: EditField) =>
+    editing?.code === item.code && editing.field === field;
 
   const handleDelete = async (code: string) => {
     if (!confirm(`确定删除卡密 ${code} 吗？`)) return;
@@ -542,6 +666,7 @@ export default function KeyTable({
           <span>卡密</span>
           <span>状态</span>
           <span>次数</span>
+          <span>过期时间</span>
           <span>批次号</span>
           <span>创建时间</span>
           <span>操作</span>
@@ -563,28 +688,109 @@ export default function KeyTable({
                     aria-label={`选择卡密 ${item.code}`}
                   />
                 </span>
-                <span
-                  className="mono copyable"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleCopy(item.code)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleCopy(item.code);
-                    }
-                  }}
-                >
-                  {item.code}
+                <div className="inline-cell">
+                  {isEditingField(item, "code") ? (
+                    <input
+                      className="input input-compact"
+                      value={editValue}
+                      onChange={(event) => setEditValue(event.target.value)}
+                      onKeyDown={(event) => handleEditKeyDown(event, item)}
+                      onBlur={() => handleEditBlur(item)}
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="editable-cell mono"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => startEdit(item, "code")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          startEdit(item, "code");
+                        }
+                      }}
+                    >
+                      {item.code}
+                    </span>
+                  )}
+                  {!isEditingField(item, "code") && (
+                    <button
+                      type="button"
+                      className="ghost-button ghost-button--tiny"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleCopy(item.code);
+                      }}
+                    >
+                      复制
+                    </button>
+                  )}
                   {copiedCode === item.code && (
                     <span className="copy-hint">已复制</span>
                   )}
-                </span>
+                </div>
                 <span className={`status-badge ${statusPillMap[item.status]}`}>
                   {statusLabelMap[item.status] || item.status}
                 </span>
                 <span>
-                  {item.usedCount ?? 0}/{item.maxUses ?? 1}
+                  {isEditingField(item, "maxUses") ? (
+                    <div className="inline-cell">
+                      <span className="muted-text">{item.usedCount ?? 0} /</span>
+                      <input
+                        className="input input-compact"
+                        type="number"
+                        min={1}
+                        max={1000}
+                        value={editValue}
+                        onChange={(event) => setEditValue(event.target.value)}
+                        onKeyDown={(event) => handleEditKeyDown(event, item)}
+                        onBlur={() => handleEditBlur(item)}
+                        autoFocus
+                      />
+                    </div>
+                  ) : (
+                    <span
+                      className="editable-cell"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => startEdit(item, "maxUses")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          startEdit(item, "maxUses");
+                        }
+                      }}
+                    >
+                      {item.usedCount ?? 0}/{item.maxUses ?? 1}
+                    </span>
+                  )}
+                </span>
+                <span>
+                  {isEditingField(item, "expiresAt") ? (
+                    <MaskedDateInput
+                      className="input input-compact"
+                      value={editValue}
+                      onChange={setEditValue}
+                      onKeyDown={(event) => handleEditKeyDown(event, item)}
+                      onBlur={() => handleEditBlur(item)}
+                    />
+                  ) : (
+                    <span
+                      className="editable-cell"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => startEdit(item, "expiresAt")}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          startEdit(item, "expiresAt");
+                        }
+                      }}
+                    >
+                      {formatLocalDateTime(item.expiresAt) || "-"}
+                    </span>
+                  )}
                 </span>
                 <span>{item.batchNo || "-"}</span>
                 <span>{new Date(item.createdAt).toLocaleString()}</span>
@@ -624,6 +830,13 @@ export default function KeyTable({
                   </button>
                 </span>
               </div>
+              {editing?.code === item.code && editError && (
+                <div className="data-table-detail">
+                  <div className="error-list" role="status" aria-live="polite">
+                    {editError}
+                  </div>
+                </div>
+              )}
               {expanded === item.code && (
                 <div className="data-table-detail">
                   <div>备注: {item.note || "-"}</div>
@@ -632,49 +845,6 @@ export default function KeyTable({
                   </div>
                   <div>
                     剩余次数: {(item.maxUses ?? 1) - (item.usedCount ?? 0)}
-                  </div>
-                  <div className="detail-actions">
-                    {editingCode === item.code ? (
-                      <div className="inline-edit">
-                        <input
-                          className="input input-compact"
-                          type="number"
-                          min={1}
-                          max={1000}
-                          value={editMaxUses}
-                          onChange={(event) =>
-                            setEditMaxUses(Number(event.target.value))
-                          }
-                        />
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={() => handleSaveUses(item.code)}
-                        >
-                          保存
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost-button"
-                          onClick={handleCancelEdit}
-                        >
-                          取消
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        className="ghost-button"
-                        onClick={() => handleEditUses(item)}
-                      >
-                        编辑验证次数
-                      </button>
-                    )}
-                    {editingCode === item.code && editError && (
-                      <div className="error-list" role="status" aria-live="polite">
-                        {editError}
-                      </div>
-                    )}
                   </div>
                   <div>过期时间: {item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "-"}</div>
                   <div>消耗时间: {item.consumedAt ? new Date(item.consumedAt).toLocaleString() : "-"}</div>
