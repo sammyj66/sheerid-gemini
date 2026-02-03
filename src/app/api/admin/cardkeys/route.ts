@@ -26,30 +26,35 @@ export async function GET(request: Request) {
 
   const where = buildCardKeyWhere({ status, query });
 
-  const [keys, total, stats] = await Promise.all([
-    prisma.cardKey.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    }),
-    prisma.cardKey.count({ where }),
-    includeStats ? getCardKeyStats(where) : Promise.resolve(null),
-  ]);
+  try {
+    const [keys, total, stats] = await Promise.all([
+      prisma.cardKey.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.cardKey.count({ where }),
+      includeStats ? getCardKeyStats(where) : Promise.resolve(null),
+    ]);
 
-  await logAdminAction({
-    action: "list_cardkeys",
-    detail: `status=${status || "ALL"} q=${query || ""} page=${page}`,
-    ip: getClientIp(request.headers),
-  });
+    await logAdminAction({
+      action: "list_cardkeys",
+      detail: `status=${status || "ALL"} q=${query || ""} page=${page}`,
+      ip: getClientIp(request.headers),
+    });
 
-  return NextResponse.json({
-    keys,
-    total,
-    page,
-    limit,
-    stats,
-  });
+    return NextResponse.json({
+      keys,
+      total,
+      page,
+      limit,
+      stats,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Database error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {

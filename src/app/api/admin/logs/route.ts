@@ -19,20 +19,25 @@ export async function GET(request: Request) {
   );
   const skip = (page - 1) * limit;
 
-  const [logs, total] = await Promise.all([
-    prisma.adminLog.findMany({
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: limit,
-    }),
-    prisma.adminLog.count(),
-  ]);
+  try {
+    const [logs, total] = await Promise.all([
+      prisma.adminLog.findMany({
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+      }),
+      prisma.adminLog.count(),
+    ]);
 
-  await logAdminAction({
-    action: "view_logs",
-    detail: `page=${page}`,
-    ip: getClientIp(request.headers),
-  });
+    await logAdminAction({
+      action: "view_logs",
+      detail: `page=${page}`,
+      ip: getClientIp(request.headers),
+    });
 
-  return NextResponse.json({ logs, total, page, limit });
+    return NextResponse.json({ logs, total, page, limit });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Database error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
