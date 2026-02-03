@@ -41,6 +41,27 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     }
   };
 
+  const handleClearLogs = async () => {
+    if (!confirm("确定清空所有审计日志吗？此操作不可恢复。")) return;
+    setLoading(true);
+    try {
+      const response = await fetch("/api/admin/logs", {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert((data as { error?: string })?.error || "清空日志失败");
+        return;
+      }
+      setLogs([]);
+      setTotal(0);
+      setPage(1);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadLogs();
   }, [refreshToken]);
@@ -53,6 +74,7 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     restore_cardkey: "恢复卡密",
     export_cardkeys: "导出卡密",
     view_logs: "查看日志",
+    clear_logs: "清空日志",
     login_success: "登录成功",
     login_failed: "登录失败",
     login_rate_limited: "登录限流",
@@ -118,6 +140,11 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     if (action === "view_logs") {
       return "查看日志记录";
     }
+    if (action === "clear_logs") {
+      const pairs = parseDetailPairs(detail);
+      const deleted = pairs.deleted || "-";
+      return `已清空 ${deleted} 条`;
+    }
     return detail;
   };
 
@@ -130,9 +157,18 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
           <div className="card-title">审计日志</div>
           <div className="card-note">记录管理员操作历史</div>
         </div>
-        <button type="button" className="ghost-button" onClick={() => loadLogs()}>
-          刷新
-        </button>
+        <div className="toolbar">
+          <button type="button" className="ghost-button" onClick={() => loadLogs()}>
+            刷新
+          </button>
+          <button
+            type="button"
+            className="ghost-button danger"
+            onClick={handleClearLogs}
+          >
+            清空日志
+          </button>
+        </div>
       </div>
 
       <div className="data-table audit-table">
