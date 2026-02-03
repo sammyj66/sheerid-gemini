@@ -75,7 +75,10 @@ export default function Home() {
           jobId: payload.jobId as string | undefined,
           resultUrl: payload.resultUrl as string | undefined,
           verificationId: payload.verificationId as string | undefined,
-          message: "已验证过，直接返回历史结果",
+          message:
+            (payload.message as string | undefined) ||
+            "已验证过，直接返回历史结果",
+          keyStatus: payload.skipConsume ? "unused" : "consumed",
         });
         setRefreshToken((prev) => prev + 1);
         return;
@@ -97,6 +100,7 @@ export default function Home() {
           resultUrl: payload.resultUrl as string | undefined,
           message: payload.message as string | undefined,
           verificationId: payload.verificationId as string | undefined,
+          keyStatus: payload.skipConsume ? "unused" : undefined,
         });
         if (completedStatuses.has(status)) {
           setRefreshToken((prev) => prev + 1);

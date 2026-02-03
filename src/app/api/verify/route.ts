@@ -58,12 +58,17 @@ export async function POST(request: Request) {
 
         const duplicate = await checkDuplicateVerification(verificationId);
         if (duplicate) {
+          const skipConsume =
+            /verification already completed/i.test(duplicate.resultMessage || "") ||
+            /precheck_success/i.test(duplicate.resultMessage || "");
           send("duplicate", {
             index: i,
             jobId: duplicate.id,
             status: duplicate.status,
             resultUrl: duplicate.resultUrl,
             verificationId,
+            message: duplicate.resultMessage,
+            skipConsume,
           });
           continue;
         }

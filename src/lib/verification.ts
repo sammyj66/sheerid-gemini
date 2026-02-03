@@ -16,39 +16,13 @@ export type VerificationResult = {
   errorCode?: string;
   verificationId?: string;
   upstreamReqId?: string;
+  skipConsume?: boolean;
 };
 
 const VERIFY_TIMEOUT_MS = 60_000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function normalizeResult(payload: Record<string, unknown>): VerificationResult {
-  const statusRaw = String(
-    payload.status ?? payload.state ?? payload.result ?? payload.currentStep ?? ""
-  ).toUpperCase();
-  const message = String(payload.message ?? "");
-  const isSuccess =
-    payload.success === true ||
-    statusRaw === "SUCCESS" ||
-    statusRaw === "PRECHECK_SUCCESS" ||
-    /verification already completed/i.test(message) ||
-    Boolean(payload.resultUrl || payload.url);
-
-  let status: VerificationResultStatus = "FAIL";
-  if (isSuccess) status = "SUCCESS";
-  else if (statusRaw === "ERROR") status = "ERROR";
-  else if (statusRaw === "TIMEOUT") status = "TIMEOUT";
-
-  return {
-    status,
-    resultUrl: (payload.resultUrl || payload.url) as string | undefined,
-    message: payload.message as string | undefined,
-    errorCode: payload.errorCode as string | undefined,
-    verificationId: payload.verificationId as string | undefined,
-    upstreamReqId: payload.upstreamReqId as string | undefined,
-  };
 }
 
 function getStep(payload: Record<string, unknown>) {
@@ -79,6 +53,35 @@ function isReviewPending(payload: Record<string, unknown>) {
   }
   const message = String(payload.message ?? "");
   return /document uploaded|waiting for review|awaiting review/i.test(message);
+}
+
+function normalizeResult(payload: Record<string, unknown>): VerificationResult {
+  const statusRaw = String(
+    payload.status ?? payload.state ?? payload.result ?? payload.currentStep ?? ""
+  ).toUpperCase();
+  const message = String(payload.message ?? "");
+  const alreadyCompleted = isAlreadyCompleted(payload);
+  const isSuccess =
+    payload.success === true ||
+    statusRaw === "SUCCESS" ||
+    statusRaw === "PRECHECK_SUCCESS" ||
+    /verification already completed/i.test(message) ||
+    Boolean(payload.resultUrl || payload.url);
+
+  let status: VerificationResultStatus = "FAIL";
+  if (isSuccess) status = "SUCCESS";
+  else if (statusRaw === "ERROR") status = "ERROR";
+  else if (statusRaw === "TIMEOUT") status = "TIMEOUT";
+
+  return {
+    status,
+    resultUrl: (payload.resultUrl || payload.url) as string | undefined,
+    message: payload.message as string | undefined,
+    errorCode: payload.errorCode as string | undefined,
+    verificationId: payload.verificationId as string | undefined,
+    upstreamReqId: payload.upstreamReqId as string | undefined,
+    skipConsume: alreadyCompleted,
+  };
 }
 
 function toDateKey(date = new Date()) {
@@ -177,12 +180,18 @@ export async function handleVerificationResult(
   });
 
   if (result.status === "SUCCESS") {
-    await consumeKey(job!.cardKeyCode);
+    if (result.skipConsume) {
+      await unlockKey(job!.cardKeyCode);
+    } else {
+      await consumeKey(job!.cardKeyCode);
+    }
   } else {
     await unlockKey(job!.cardKeyCode);
   }
 
-  await updateDailyStats(result.status);
+  if (!result.skipConsume) {
+    await updateDailyStats(result.status);
+  }
   return result;
 }
 

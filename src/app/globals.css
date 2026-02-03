@@ -797,6 +797,22 @@ button {
   word-break: break-all;
 }
 
+.copyable {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copy-hint {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(34, 211, 238, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .admin-panel {
   display: grid;
   gap: 12px;

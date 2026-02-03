@@ -17,6 +17,7 @@ export type VerificationProgressItem = {
   cardKey: string;
   verificationId?: string;
   status: VerificationStatus;
+  keyStatus?: "consumed" | "locked" | "unused";
   message?: string;
   resultUrl?: string;
   jobId?: string;
@@ -42,7 +43,10 @@ const statusIcon: Record<VerificationStatus, string> = {
   duplicate: "✅",
 };
 
-function getKeyBadge(status: VerificationStatus) {
+function getKeyBadge(status: VerificationStatus, keyStatus?: VerificationProgressItem["keyStatus"]) {
+  if (keyStatus === "consumed") return "卡密已消耗";
+  if (keyStatus === "locked") return "卡密已锁定";
+  if (keyStatus === "unused") return "卡密未消耗";
   if (status === "success" || status === "duplicate") return "卡密已消耗";
   if (status === "processing" || status === "pending") return "卡密已锁定";
   return "卡密已回滚";
@@ -113,7 +117,7 @@ export default function VerificationProgress({
                 <div className={`status-badge status-${statusClass}`}>
                   {statusIcon[item.status]} {statusLabel[item.status]}
                 </div>
-                <div className="key-badge">{getKeyBadge(item.status)}</div>
+                <div className="key-badge">{getKeyBadge(item.status, item.keyStatus)}</div>
               </div>
 
               {item.verificationId && (

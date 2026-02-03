@@ -52,6 +52,7 @@ export default function KeyTable({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / filters.limit));
 
@@ -113,6 +114,44 @@ export default function KeyTable({
     });
     await loadData();
     onUpdated();
+  };
+
+  const handleRestore = async (code: string) => {
+    const response = await fetch(`/api/admin/cardkeys/${code}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ action: "restore" }),
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      alert((data as { error?: string })?.error || "恢复失败");
+      return;
+    }
+    await loadData();
+    onUpdated();
+  };
+
+  const handleCopy = async (code: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(code);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = code;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode((prev) => (prev === code ? null : prev)), 1200);
+    } catch {
+      alert("复制失败");
+    }
   };
 
   const handleDelete = async (code: string) => {
@@ -192,7 +231,23 @@ export default function KeyTable({
           items.map((item) => (
             <div key={item.code}>
               <div className="data-table-row">
-                <span className="mono">{item.code}</span>
+                <span
+                  className="mono copyable"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleCopy(item.code)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleCopy(item.code);
+                    }
+                  }}
+                >
+                  {item.code}
+                  {copiedCode === item.code && (
+                    <span className="copy-hint">已复制</span>
+                  )}
+                </span>
                 <span className={`status-badge ${statusPillMap[item.status]}`}>
                   {item.status}
                 </span>
@@ -215,6 +270,15 @@ export default function KeyTable({
                   >
                     作废
                   </button>
+                  {item.status === "REVOKED" && (
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => handleRestore(item.code)}
+                    >
+                      恢复
+                    </button>
+                  )}
                   <button
                     type="button"
                     className="ghost-button danger"
