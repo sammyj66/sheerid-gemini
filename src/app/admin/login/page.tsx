@@ -48,13 +48,7 @@ export default function AdminLoginPage() {
           <div className="card-header">
             <div>
               <div className="title-row">
-                <span className="title-badge" aria-hidden="true">
-                  <svg className="gemini-logo" viewBox="0 0 24 24" focusable="false">
-                    <path d="M12 2 L22 20 L12 20 Z" fill="#7c3aed" />
-                    <path d="M12 2 L12 20 L2 20 Z" fill="#22d3ee" />
-                    <path d="M12 4.6 L19.4 19 H4.6 Z" fill="rgba(251, 113, 133, 0.55)" />
-                  </svg>
-                </span>
+                <span className="title-badge">🔐</span>
                 <div className="card-title">管理员登录</div>
               </div>
               <div className="card-note">请输入管理员密码</div>
