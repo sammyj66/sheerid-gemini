@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type CardKey = {
   code: string;
@@ -41,6 +41,15 @@ const statusPillMap: Record<string, string> = {
   EXPIRED: "status-timeout",
 };
 
+const statusLabelMap: Record<string, string> = {
+  UNUSED: "未使用",
+  LOCKED: "已锁定",
+  CONSUMED: "已消耗",
+  USED: "已使用",
+  REVOKED: "已作废",
+  EXPIRED: "已过期",
+};
+
 export default function KeyTable({
   filters,
   onFiltersChange,
@@ -53,6 +62,8 @@ export default function KeyTable({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / filters.limit));
 
@@ -78,6 +89,7 @@ export default function KeyTable({
       }
       setItems(data.keys || []);
       setTotal(data.total || 0);
+      setSelectedCodes([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -88,6 +100,30 @@ export default function KeyTable({
   useEffect(() => {
     loadData();
   }, [queryParams, refreshToken]);
+
+  const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
+  const allSelected = items.length > 0 && items.every((item) => selectedSet.has(item.code));
+  const someSelected = items.some((item) => selectedSet.has(item.code));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = !allSelected && someSelected;
+    }
+  }, [allSelected, someSelected]);
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelectedCodes([]);
+    } else {
+      setSelectedCodes(items.map((item) => item.code));
+    }
+  };
+
+  const toggleSelectOne = (code: string) => {
+    setSelectedCodes((prev) =>
+      prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
+    );
+  };
 
   const handleStatusChange = (value: string) => {
     onFiltersChange({ ...filters, status: value, page: 1 });
@@ -139,6 +175,138 @@ export default function KeyTable({
       setTotal(prevTotal);
       alert(err instanceof Error ? err.message : "作废失败");
     }
+  };
+
+  const handleBulkRevoke = async () => {
+    if (selectedCodes.length === 0) return;
+    if (!confirm(`确定作废选中的 ${selectedCodes.length} 条卡密吗？`)) return;
+
+    const prevItems = items;
+    const prevTotal = total;
+    const shouldRemove = filters.status !== "ALL" && filters.status !== "REVOKED";
+    const selectedSetLocal = new Set(selectedCodes);
+
+    if (shouldRemove) {
+      const removeCount = items.filter((item) => selectedSetLocal.has(item.code)).length;
+      setItems((prev) => prev.filter((item) => !selectedSetLocal.has(item.code)));
+      setTotal((prev) => Math.max(0, prev - removeCount));
+    } else {
+      setItems((prev) =>
+        prev.map((item) =>
+          selectedSetLocal.has(item.code) ? { ...item, status: "REVOKED" } : item
+        )
+      );
+    }
+
+    try {
+      const responses = await Promise.all(
+        selectedCodes.map((code) =>
+          fetch(`/api/admin/cardkeys/${code}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ action: "revoke" }),
+          })
+        )
+      );
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        throw new Error((data as { error?: string })?.error || "批量作废失败");
+      }
+      setSelectedCodes([]);
+      onUpdated();
+    } catch (err) {
+      setItems(prevItems);
+      setTotal(prevTotal);
+      alert(err instanceof Error ? err.message : "批量作废失败");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedCodes.length === 0) return;
+    if (!confirm(`确定删除选中的 ${selectedCodes.length} 条卡密吗？`)) return;
+
+    const prevItems = items;
+    const prevTotal = total;
+    const selectedSetLocal = new Set(selectedCodes);
+    const removeCount = items.filter((item) => selectedSetLocal.has(item.code)).length;
+    setItems((prev) => prev.filter((item) => !selectedSetLocal.has(item.code)));
+    setTotal((prev) => Math.max(0, prev - removeCount));
+
+    try {
+      const responses = await Promise.all(
+        selectedCodes.map((code) =>
+          fetch(`/api/admin/cardkeys/${code}`, {
+            method: "DELETE",
+            credentials: "include",
+          })
+        )
+      );
+      const failed = responses.find((response) => !response.ok);
+      if (failed) {
+        const data = await failed.json().catch(() => ({}));
+        throw new Error((data as { error?: string })?.error || "批量删除失败");
+      }
+      setSelectedCodes([]);
+      onUpdated();
+    } catch (err) {
+      setItems(prevItems);
+      setTotal(prevTotal);
+      alert(err instanceof Error ? err.message : "批量删除失败");
+    }
+  };
+
+  const downloadFile = (content: string, filename: string, type: string) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleBulkExport = (format: "csv" | "txt") => {
+    if (selectedCodes.length === 0) return;
+    const selectedSetLocal = new Set(selectedCodes);
+    const selectedItems = items.filter((item) => selectedSetLocal.has(item.code));
+
+    if (format === "txt") {
+      const content = selectedItems.map((item) => item.code).join("\n");
+      downloadFile(content, "cardkeys.txt", "text/plain;charset=utf-8");
+      return;
+    }
+
+    const header = [
+      "code",
+      "status",
+      "batchNo",
+      "note",
+      "createdAt",
+      "expiresAt",
+      "consumedAt",
+    ];
+    const rows = selectedItems.map((item) => [
+      item.code,
+      statusLabelMap[item.status] || item.status,
+      item.batchNo || "",
+      item.note || "",
+      item.createdAt,
+      item.expiresAt || "",
+      item.consumedAt || "",
+    ]);
+    const csv = [
+      header.join(","),
+      ...rows.map((row) =>
+        row
+          .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+          .join(",")
+      ),
+    ].join("\n");
+    downloadFile(csv, "cardkeys.csv", "text/csv;charset=utf-8");
   };
 
   const handleRestore = async (code: string) => {
@@ -254,6 +422,38 @@ export default function KeyTable({
         </div>
       </div>
 
+      {selectedCodes.length > 0 && (
+        <div className="bulk-actions">
+          <span className="card-note">已选中 {selectedCodes.length} 条</span>
+          <div className="toolbar">
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => handleBulkExport("csv")}
+            >
+              批量导出 CSV
+            </button>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => handleBulkExport("txt")}
+            >
+              批量导出 TXT
+            </button>
+            <button type="button" className="ghost-button" onClick={handleBulkRevoke}>
+              批量作废
+            </button>
+            <button
+              type="button"
+              className="ghost-button danger"
+              onClick={handleBulkDelete}
+            >
+              批量删除
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="error-list" role="status" aria-live="polite">
           {error}
@@ -262,6 +462,16 @@ export default function KeyTable({
 
       <div className="data-table">
         <div className="data-table-head">
+          <span>
+            <input
+              ref={selectAllRef}
+              type="checkbox"
+              className="table-checkbox"
+              checked={allSelected}
+              onChange={toggleSelectAll}
+              aria-label="全选"
+            />
+          </span>
           <span>卡密</span>
           <span>状态</span>
           <span>批次号</span>
@@ -276,6 +486,15 @@ export default function KeyTable({
           items.map((item) => (
             <div key={item.code}>
               <div className="data-table-row">
+                <span>
+                  <input
+                    type="checkbox"
+                    className="table-checkbox"
+                    checked={selectedSet.has(item.code)}
+                    onChange={() => toggleSelectOne(item.code)}
+                    aria-label={`选择卡密 ${item.code}`}
+                  />
+                </span>
                 <span
                   className="mono copyable"
                   role="button"
@@ -294,7 +513,7 @@ export default function KeyTable({
                   )}
                 </span>
                 <span className={`status-badge ${statusPillMap[item.status]}`}>
-                  {item.status}
+                  {statusLabelMap[item.status] || item.status}
                 </span>
                 <span>{item.batchNo || "-"}</span>
                 <span>{new Date(item.createdAt).toLocaleString()}</span>

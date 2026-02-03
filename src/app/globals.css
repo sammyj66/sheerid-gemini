@@ -730,6 +730,25 @@ a.progress-link:hover {
   flex-wrap: wrap;
 }
 
+.bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--border);
+  background: rgba(14, 20, 42, 0.65);
+}
+
+.table-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-2);
+  cursor: pointer;
+}
+
 .data-table {
   display: grid;
   gap: 8px;
@@ -738,7 +757,7 @@ a.progress-link:hover {
 .data-table-head,
 .data-table-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.3fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(200px, 1fr);
+  grid-template-columns: 36px minmax(160px, 1.3fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(200px, 1fr);
   gap: 12px;
   align-items: center;
 }
