@@ -1,4 +1,4 @@
-const UPSTREAM_BASE = "https://neigui.1key.me";
+const UPSTREAM_BASE = process.env.UPSTREAM_BASE || "https://neigui.1key.me";
 const UPSTREAM_TIMEOUT_MS = 60_000;
 
 type TimeoutSignal = { signal: AbortSignal; cleanup: () => void };
@@ -38,8 +38,49 @@ function extractCsrfTokenFromHtml(html: string): string | null {
   const inlineMatch =
     html.match(/CSRF_TOKEN\s*=?\s*["']([^"']+)["']/i) ||
     html.match(/csrfToken["']?\s*[:=]\s*["']([^"']+)["']/i) ||
-    html.match(/csrf-token["']?\s*[:=]\s*["']([^"']+)["']/i);
+    html.match(/csrf[-_]?token["']?\s*[:=]\s*["']([^"']+)["']/i) ||
+    html.match(/XSRF[-_]?TOKEN["']?\s*[:=]\s*["']([^"']+)["']/i);
   if (inlineMatch) return inlineMatch[1];
+  return null;
+}
+
+function getSetCookieHeader(res: Response): string | null {
+  const headers = res.headers as Headers & { getSetCookie?: () => string[] };
+  if (typeof headers.getSetCookie === "function") {
+    const values = headers.getSetCookie();
+    return values.length ? values.join(",") : null;
+  }
+  return res.headers.get("set-cookie");
+}
+
+function extractTokenFromCookies(cookieHeader: string | undefined | null) {
+  if (!cookieHeader) return null;
+  const pairs = cookieHeader.split(";").map((part) => part.trim());
+  for (const pair of pairs) {
+    const [name, ...rest] = pair.split("=");
+    if (!name) continue;
+    const value = rest.join("=");
+    const key = name.toLowerCase();
+    if (
+      key === "csrf-token" ||
+      key === "csrftoken" ||
+      key === "xsrf-token" ||
+      key === "xsrf_token"
+    ) {
+      return decodeURIComponent(value);
+    }
+  }
+  return null;
+}
+
+function extractTokenFromSetCookie(setCookie: string | null) {
+  if (!setCookie) return null;
+  const parts = setCookie.split(/,(?=[^;]+?=)/);
+  for (const part of parts) {
+    const [cookiePair] = part.split(";");
+    const token = extractTokenFromCookies(cookiePair);
+    if (token) return token;
+  }
   return null;
 }
 
@@ -82,6 +123,10 @@ export async function getCsrfToken(): Promise<CsrfSession> {
     cache: "no-store",
   });
   let cookie = updateCookieFromResponse(pageRes, undefined);
+  const pageSetCookieToken = extractTokenFromSetCookie(getSetCookieHeader(pageRes));
+  if (pageSetCookieToken) {
+    return { token: pageSetCookieToken, cookie };
+  }
 
   const pageHtml = await pageRes.text();
   const pageToken = extractCsrfTokenFromHtml(pageHtml);
@@ -89,11 +134,16 @@ export async function getCsrfToken(): Promise<CsrfSession> {
 
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/csrf`, {
     method: "GET",
-    headers: defaultHeaders,
+    headers: {
+      ...defaultHeaders,
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
     cache: "no-store",
   });
 
   cookie = updateCookieFromResponse(res, cookie);
+  const apiSetCookieToken = extractTokenFromSetCookie(getSetCookieHeader(res));
+  if (apiSetCookieToken) return { token: apiSetCookieToken, cookie };
 
   const body = await res.text();
   const headerToken = res.headers.get("x-csrf-token");
@@ -110,6 +160,8 @@ export async function getCsrfToken(): Promise<CsrfSession> {
 
   const htmlToken = extractCsrfTokenFromHtml(body);
   if (htmlToken) return { token: htmlToken, cookie };
+  const cookieToken = extractTokenFromCookies(cookie);
+  if (cookieToken) return { token: cookieToken, cookie };
 
   throw new Error("无法获取上游 CSRF Token");
 }
