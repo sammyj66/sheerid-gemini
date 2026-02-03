@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import KeyGenerator from "@/components/admin/KeyGenerator";
 import KeyTable from "@/components/admin/KeyTable";
-import KeyExport from "@/components/admin/KeyExport";
 import AuditLogTable from "@/components/admin/AuditLogTable";
 
 type Stats = {
@@ -134,9 +133,6 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="bento-unit">枚</div>
               </div>
-            </div>
-            <div className="toolbar">
-              <KeyExport status={filters.status} query={filters.query} />
             </div>
           </div>
         </section>

@@ -431,24 +431,24 @@ export default function KeyTable({
               className="ghost-button"
               onClick={() => handleBulkExport("csv")}
             >
-              批量导出 CSV
+              导出 CSV
             </button>
             <button
               type="button"
               className="ghost-button"
               onClick={() => handleBulkExport("txt")}
             >
-              批量导出 TXT
+              导出 TXT
             </button>
             <button type="button" className="ghost-button" onClick={handleBulkRevoke}>
-              批量作废
+              作废
             </button>
             <button
               type="button"
               className="ghost-button danger"
               onClick={handleBulkDelete}
             >
-              批量删除
+              删除
             </button>
           </div>
         </div>

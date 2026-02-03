@@ -762,6 +762,16 @@ a.progress-link:hover {
   align-items: center;
 }
 
+.audit-table .data-table-head,
+.audit-table .data-table-row {
+  grid-template-columns: minmax(180px, 1.1fr) minmax(120px, 0.8fr) minmax(240px, 1.6fr) minmax(120px, 0.8fr);
+}
+
+.audit-table .data-table-row span {
+  min-width: 0;
+  word-break: break-word;
+}
+
 .data-table-head {
   font-size: 12px;
   text-transform: uppercase;
