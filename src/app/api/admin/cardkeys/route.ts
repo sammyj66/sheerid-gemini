@@ -17,22 +17,30 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const query = searchParams.get("q");
   const includeStats = searchParams.get("includeStats") === "1";
+  const fetchAll = searchParams.get("all") === "1";
+  const fields = searchParams.get("fields");
   const page = Math.max(1, Number(searchParams.get("page") || 1));
   const limit = Math.min(
     MAX_LIMIT,
     Math.max(1, Number(searchParams.get("limit") || 20))
   );
-  const skip = (page - 1) * limit;
+  const skip = fetchAll ? 0 : (page - 1) * limit;
 
   const where = buildCardKeyWhere({ status, query });
 
   try {
+    const select =
+      fields === "code"
+        ? { code: true }
+        : undefined;
+
     const [keys, total, stats] = await Promise.all([
       prisma.cardKey.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
-        take: limit,
+        take: fetchAll ? undefined : limit,
+        ...(select ? { select } : {}),
       }),
       prisma.cardKey.count({ where }),
       includeStats ? getCardKeyStats(where) : Promise.resolve(null),

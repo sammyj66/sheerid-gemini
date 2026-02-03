@@ -5,7 +5,10 @@ import { logAdminAction } from "@/lib/admin/audit";
 import { buildCardKeyWhere } from "@/lib/admin/cardkeys";
 
 function toCsvValue(value: string | null | undefined) {
-  const safe = value ?? "";
+  let safe = value ?? "";
+  if (/^[=+\-@]/.test(safe)) {
+    safe = `'${safe}`;
+  }
   if (safe.includes(",") || safe.includes("\"") || safe.includes("\n")) {
     return `"${safe.replace(/"/g, "\"\"")}"`;
   }

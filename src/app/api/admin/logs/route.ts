@@ -29,12 +29,6 @@ export async function GET(request: Request) {
       prisma.adminLog.count(),
     ]);
 
-    await logAdminAction({
-      action: "view_logs",
-      detail: `page=${page}`,
-      ip: getClientIp(request.headers),
-    });
-
     return NextResponse.json({ logs, total, page, limit });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Database error";

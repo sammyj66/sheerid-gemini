@@ -94,6 +94,7 @@ export default function KeyTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [selectAllAcross, setSelectAllAcross] = useState(false);
   const [editing, setEditing] = useState<{ code: string; field: EditField } | null>(null);
   const [editValue, setEditValue] = useState("");
   const [editError, setEditError] = useState<string | null>(null);
@@ -125,6 +126,7 @@ export default function KeyTable({
       setItems(data.keys || []);
       setTotal(data.total || 0);
       setSelectedCodes([]);
+      setSelectAllAcross(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "加载失败");
     } finally {
@@ -137,8 +139,11 @@ export default function KeyTable({
   }, [queryParams, refreshToken]);
 
   const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
-  const allSelected = items.length > 0 && items.every((item) => selectedSet.has(item.code));
-  const someSelected = items.some((item) => selectedSet.has(item.code));
+  const allSelected =
+    selectAllAcross ||
+    (items.length > 0 && items.every((item) => selectedSet.has(item.code)));
+  const someSelected =
+    !selectAllAcross && items.some((item) => selectedSet.has(item.code));
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -146,15 +151,37 @@ export default function KeyTable({
     }
   }, [allSelected, someSelected]);
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = async () => {
     if (allSelected) {
       setSelectedCodes([]);
-    } else {
-      setSelectedCodes(items.map((item) => item.code));
+      setSelectAllAcross(false);
+      return;
+    }
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.set("status", filters.status || "ALL");
+      queryParams.set("q", filters.query || "");
+      queryParams.set("all", "1");
+      queryParams.set("fields", "code");
+      const response = await fetch(`/api/admin/cardkeys?${queryParams.toString()}`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "全选失败");
+      }
+      const codes = Array.isArray(data.keys)
+        ? data.keys.map((item: { code: string }) => item.code)
+        : [];
+      setSelectedCodes(codes);
+      setSelectAllAcross(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "全选失败");
     }
   };
 
   const toggleSelectOne = (code: string) => {
+    setSelectAllAcross(false);
     setSelectedCodes((prev) =>
       prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code]
     );
@@ -250,7 +277,9 @@ export default function KeyTable({
         throw new Error((data as { error?: string })?.error || "批量作废失败");
       }
       setSelectedCodes([]);
+      setSelectAllAcross(false);
       onUpdated();
+      await loadData();
     } catch (err) {
       setItems(prevItems);
       setTotal(prevTotal);
@@ -284,7 +313,9 @@ export default function KeyTable({
         throw new Error((data as { error?: string })?.error || "批量删除失败");
       }
       setSelectedCodes([]);
+      setSelectAllAcross(false);
       onUpdated();
+      await loadData();
     } catch (err) {
       setItems(prevItems);
       setTotal(prevTotal);
@@ -304,10 +335,26 @@ export default function KeyTable({
     URL.revokeObjectURL(url);
   };
 
-  const handleBulkExport = (format: "csv" | "txt") => {
+  const handleBulkExport = async (format: "csv" | "txt") => {
     if (selectedCodes.length === 0) return;
     const selectedSetLocal = new Set(selectedCodes);
-    const selectedItems = items.filter((item) => selectedSetLocal.has(item.code));
+    let selectedItems = items.filter((item) => selectedSetLocal.has(item.code));
+
+    if (selectAllAcross) {
+      const queryParams = new URLSearchParams();
+      queryParams.set("status", filters.status || "ALL");
+      queryParams.set("q", filters.query || "");
+      queryParams.set("all", "1");
+      const response = await fetch(`/api/admin/cardkeys?${queryParams.toString()}`, {
+        credentials: "include",
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data?.error || "导出失败");
+        return;
+      }
+      selectedItems = Array.isArray(data.keys) ? data.keys : [];
+    }
 
     if (format === "txt") {
       const content = selectedItems.map((item) => item.code).join("\n");
@@ -327,7 +374,7 @@ export default function KeyTable({
       "expiresAt",
       "consumedAt",
     ];
-    const rows = selectedItems.map((item) => [
+    const rows = selectedItems.map((item: CardKey) => [
       item.code,
       statusLabelMap[item.status] || item.status,
       String(item.maxUses ?? 1),
