@@ -27,6 +27,13 @@ export async function lockKey(code: string, jobId: string) {
   if (!cardKey) {
     throw new Error("卡密不存在");
   }
+  if (cardKey.expiresAt && cardKey.expiresAt.getTime() < Date.now()) {
+    await prisma.cardKey.update({
+      where: { code },
+      data: { status: "EXPIRED" },
+    });
+    throw new Error("卡密已过期");
+  }
   if (cardKey.status !== "UNUSED") {
     throw new Error("卡密不可用或已被锁定");
   }
