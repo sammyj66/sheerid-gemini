@@ -38,6 +38,7 @@ function extractCsrfTokenFromHtml(html: string): string | null {
     html.match(/content=["']([^"']+)["']\s+name=["']csrf-token["']/i);
   if (metaMatch) return metaMatch[1];
   const inlineMatch =
+    html.match(/CSRF_TOKEN\s*=?\s*["']([^"']+)["']/i) ||
     html.match(/csrfToken["']?\s*[:=]\s*["']([^"']+)["']/i) ||
     html.match(/csrf-token["']?\s*[:=]\s*["']([^"']+)["']/i);
   if (inlineMatch) return inlineMatch[1];
@@ -55,11 +56,28 @@ function updateCookieFromResponse(res: Response) {
 }
 
 export async function getCsrfToken(): Promise<string> {
+  const defaultHeaders = {
+    accept: "text/html,application/json,*/*",
+    "user-agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    referer: `${UPSTREAM_BASE}/`,
+  };
+
+  const pageRes = await fetchWithTimeout(UPSTREAM_BASE, {
+    method: "GET",
+    headers: defaultHeaders,
+    cache: "no-store",
+  });
+
+  updateCookieFromResponse(pageRes);
+
+  const pageHtml = await pageRes.text();
+  const pageToken = extractCsrfTokenFromHtml(pageHtml);
+  if (pageToken) return pageToken;
+
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/csrf`, {
     method: "GET",
-    headers: {
-      accept: "application/json,text/html,*/*",
-    },
+    headers: defaultHeaders,
     cache: "no-store",
   });
 
@@ -94,6 +112,8 @@ export async function submitBatchVerification(ids: string[], cdk: string) {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
       "X-CSRF-Token": csrfToken,
+      Origin: UPSTREAM_BASE,
+      Referer: `${UPSTREAM_BASE}/`,
       ...(csrfCookie ? { Cookie: csrfCookie } : {}),
     },
     body: JSON.stringify({
@@ -121,6 +141,8 @@ export async function checkPendingStatus(checkToken: string) {
       "Content-Type": "application/json",
       Accept: "application/json",
       "X-CSRF-Token": csrfToken,
+      Origin: UPSTREAM_BASE,
+      Referer: `${UPSTREAM_BASE}/`,
       ...(csrfCookie ? { Cookie: csrfCookie } : {}),
     },
     body: JSON.stringify({ checkToken }),
