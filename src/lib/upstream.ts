@@ -66,9 +66,17 @@ function extractTokenFromCookies(cookieHeader: string | undefined | null) {
       key === "csrf-token" ||
       key === "csrftoken" ||
       key === "xsrf-token" ||
-      key === "xsrf_token"
+      key === "xsrf_token" ||
+      key === "next-auth.csrf-token" ||
+      key === "__host-next-auth.csrf-token" ||
+      key === "__secure-next-auth.csrf-token"
     ) {
-      return decodeURIComponent(value);
+      const decoded = decodeURIComponent(value);
+      return decoded.split("|")[0];
+    }
+    if (key.includes("csrf")) {
+      const decoded = decodeURIComponent(value);
+      return decoded.split("|")[0];
     }
   }
   return null;
