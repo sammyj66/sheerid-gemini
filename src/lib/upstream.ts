@@ -1,8 +1,6 @@
 const UPSTREAM_BASE = "https://neigui.1key.me";
 const UPSTREAM_TIMEOUT_MS = 60_000;
 
-let csrfCookie: string | undefined;
-
 type TimeoutSignal = { signal: AbortSignal; cleanup: () => void };
 
 function createTimeoutSignal(ms: number): TimeoutSignal {
@@ -45,17 +43,32 @@ function extractCsrfTokenFromHtml(html: string): string | null {
   return null;
 }
 
-function updateCookieFromResponse(res: Response) {
-  const setCookie = res.headers.get("set-cookie");
-  if (!setCookie) return;
-  csrfCookie = setCookie
-    .split(",")
-    .map((part) => part.split(";")[0].trim())
-    .filter(Boolean)
-    .join("; ");
+function mergeCookieHeader(existing: string | undefined, setCookie: string | null) {
+  if (!setCookie) return existing;
+  const merged = [
+    ...(existing ? existing.split(";").map((item) => item.trim()).filter(Boolean) : []),
+    ...setCookie
+      .split(",")
+      .map((part) => part.split(";")[0].trim())
+      .filter(Boolean),
+  ];
+  return merged.length ? merged.join("; ") : undefined;
 }
 
-export async function getCsrfToken(): Promise<string> {
+function updateCookieFromResponse(
+  res: Response,
+  currentCookie: string | undefined
+) {
+  const setCookie = res.headers.get("set-cookie");
+  return mergeCookieHeader(currentCookie, setCookie);
+}
+
+export type CsrfSession = {
+  token: string;
+  cookie?: string;
+};
+
+export async function getCsrfToken(): Promise<CsrfSession> {
   const defaultHeaders = {
     accept: "text/html,application/json,*/*",
     "user-agent":
@@ -68,12 +81,11 @@ export async function getCsrfToken(): Promise<string> {
     headers: defaultHeaders,
     cache: "no-store",
   });
-
-  updateCookieFromResponse(pageRes);
+  let cookie = updateCookieFromResponse(pageRes, undefined);
 
   const pageHtml = await pageRes.text();
   const pageToken = extractCsrfTokenFromHtml(pageHtml);
-  if (pageToken) return pageToken;
+  if (pageToken) return { token: pageToken, cookie };
 
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/csrf`, {
     method: "GET",
@@ -81,23 +93,23 @@ export async function getCsrfToken(): Promise<string> {
     cache: "no-store",
   });
 
-  updateCookieFromResponse(res);
+  cookie = updateCookieFromResponse(res, cookie);
 
   const body = await res.text();
   const headerToken = res.headers.get("x-csrf-token");
 
-  if (headerToken) return headerToken;
+  if (headerToken) return { token: headerToken, cookie };
 
   try {
     const json = JSON.parse(body);
-    if (typeof json?.csrfToken === "string") return json.csrfToken;
-    if (typeof json?.token === "string") return json.token;
+    if (typeof json?.csrfToken === "string") return { token: json.csrfToken, cookie };
+    if (typeof json?.token === "string") return { token: json.token, cookie };
   } catch {
     // fall through to HTML parse
   }
 
   const htmlToken = extractCsrfTokenFromHtml(body);
-  if (htmlToken) return htmlToken;
+  if (htmlToken) return { token: htmlToken, cookie };
 
   throw new Error("无法获取上游 CSRF Token");
 }
@@ -105,16 +117,16 @@ export async function getCsrfToken(): Promise<string> {
 export async function submitBatchVerification(ids: string[], cdk: string) {
   if (!cdk) throw new Error("UPSTREAM_CDK 未配置");
 
-  const csrfToken = await getCsrfToken();
+  const { token, cookie } = await getCsrfToken();
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/batch`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "text/event-stream",
-      "X-CSRF-Token": csrfToken,
+      "X-CSRF-Token": token,
       Origin: UPSTREAM_BASE,
       Referer: `${UPSTREAM_BASE}/`,
-      ...(csrfCookie ? { Cookie: csrfCookie } : {}),
+      ...(cookie ? { Cookie: cookie } : {}),
     },
     body: JSON.stringify({
       verificationIds: ids,
@@ -134,16 +146,16 @@ export async function submitBatchVerification(ids: string[], cdk: string) {
 }
 
 export async function checkPendingStatus(checkToken: string) {
-  const csrfToken = await getCsrfToken();
+  const { token, cookie } = await getCsrfToken();
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/check-status`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
-      "X-CSRF-Token": csrfToken,
+      "X-CSRF-Token": token,
       Origin: UPSTREAM_BASE,
       Referer: `${UPSTREAM_BASE}/`,
-      ...(csrfCookie ? { Cookie: csrfCookie } : {}),
+      ...(cookie ? { Cookie: cookie } : {}),
     },
     body: JSON.stringify({ checkToken }),
   });
