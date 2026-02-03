@@ -12,7 +12,7 @@ function getToken(request: NextRequest) {
   return cookies.admin_session || null;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminApi = pathname.startsWith("/api/admin");
   const isLoginApi = pathname === "/api/admin/login";
