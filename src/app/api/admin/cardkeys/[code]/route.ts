@@ -50,7 +50,7 @@ export async function PATCH(request: Request, context: Context) {
   }
 
   const { code } = await context.params;
-  let payload: { action?: string } = {};
+  let payload: { action?: string; maxUses?: number } = {};
 
   try {
     payload = (await request.json()) as typeof payload;
@@ -58,7 +58,11 @@ export async function PATCH(request: Request, context: Context) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (payload.action !== "revoke" && payload.action !== "restore") {
+  if (
+    payload.action !== "revoke" &&
+    payload.action !== "restore" &&
+    payload.action !== "set_uses"
+  ) {
     return NextResponse.json({ error: "Unsupported action" }, { status: 400 });
   }
 
@@ -102,6 +106,56 @@ export async function PATCH(request: Request, context: Context) {
       detail: `code=${code}`,
       ip: getClientIp(request.headers),
     });
+  }
+
+  if (payload.action === "set_uses") {
+    const maxUses = Number(payload.maxUses);
+    if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 1000) {
+      return NextResponse.json(
+        { error: "maxUses 必须为 1-1000 的整数" },
+        { status: 400 }
+      );
+    }
+
+    const cardKey = await prisma.cardKey.findUnique({ where: { code } });
+    if (!cardKey) {
+      return NextResponse.json({ error: "卡密不存在" }, { status: 404 });
+    }
+    if (cardKey.status === "LOCKED") {
+      return NextResponse.json({ error: "卡密正在使用中" }, { status: 409 });
+    }
+
+    const nextUsedCount = Math.min(cardKey.usedCount, maxUses);
+    let nextStatus = cardKey.status;
+    let consumedAt = cardKey.consumedAt;
+
+    if (cardKey.status === "UNUSED" || cardKey.status === "CONSUMED") {
+      if (nextUsedCount >= maxUses) {
+        nextStatus = "CONSUMED";
+        consumedAt = consumedAt ?? new Date();
+      } else {
+        nextStatus = "UNUSED";
+        consumedAt = null;
+      }
+    }
+
+    const updated = await prisma.cardKey.update({
+      where: { code },
+      data: {
+        maxUses,
+        usedCount: nextUsedCount,
+        status: nextStatus,
+        consumedAt,
+      },
+    });
+
+    await logAdminAction({
+      action: "update_cardkey_uses",
+      detail: `code=${code} maxUses=${maxUses} usedCount=${nextUsedCount}`,
+      ip: getClientIp(request.headers),
+    });
+
+    return NextResponse.json({ success: true, cardKey: updated });
   }
 
   return NextResponse.json({ success: true });

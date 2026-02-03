@@ -65,6 +65,9 @@ export default function KeyTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [selectedCodes, setSelectedCodes] = useState<string[]>([]);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editMaxUses, setEditMaxUses] = useState(1);
+  const [editError, setEditError] = useState<string | null>(null);
   const selectAllRef = useRef<HTMLInputElement | null>(null);
 
   const totalPages = Math.max(1, Math.ceil(total / filters.limit));
@@ -375,6 +378,62 @@ export default function KeyTable({
     }
   };
 
+  const handleEditUses = (item: CardKey) => {
+    setEditingCode(item.code);
+    setEditMaxUses(item.maxUses ?? 1);
+    setEditError(null);
+  };
+
+  const handleSaveUses = async (code: string) => {
+    const nextMaxUses = Number(editMaxUses);
+    if (!Number.isInteger(nextMaxUses) || nextMaxUses < 1 || nextMaxUses > 1000) {
+      setEditError("可验证次数必须为 1-1000 的整数");
+      return;
+    }
+
+    const prevItems = items;
+    setItems((prev) =>
+      prev.map((item) =>
+        item.code === code
+          ? {
+              ...item,
+              maxUses: nextMaxUses,
+              usedCount: Math.min(item.usedCount ?? 0, nextMaxUses),
+            }
+          : item
+      )
+    );
+
+    try {
+      const response = await fetch(`/api/admin/cardkeys/${code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "set_uses", maxUses: nextMaxUses }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error((data as { error?: string })?.error || "更新失败");
+      }
+      if (data?.cardKey) {
+        setItems((prev) =>
+          prev.map((item) => (item.code === code ? data.cardKey : item))
+        );
+      }
+      setEditingCode(null);
+      setEditError(null);
+      onUpdated();
+    } catch (err) {
+      setItems(prevItems);
+      setEditError(err instanceof Error ? err.message : "更新失败");
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingCode(null);
+    setEditError(null);
+  };
+
   const handleDelete = async (code: string) => {
     if (!confirm(`确定删除卡密 ${code} 吗？`)) return;
     const response = await fetch(`/api/admin/cardkeys/${code}`, {
@@ -573,6 +632,49 @@ export default function KeyTable({
                   </div>
                   <div>
                     剩余次数: {(item.maxUses ?? 1) - (item.usedCount ?? 0)}
+                  </div>
+                  <div className="detail-actions">
+                    {editingCode === item.code ? (
+                      <div className="inline-edit">
+                        <input
+                          className="input input-compact"
+                          type="number"
+                          min={1}
+                          max={1000}
+                          value={editMaxUses}
+                          onChange={(event) =>
+                            setEditMaxUses(Number(event.target.value))
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={() => handleSaveUses(item.code)}
+                        >
+                          保存
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          onClick={handleCancelEdit}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => handleEditUses(item)}
+                      >
+                        编辑验证次数
+                      </button>
+                    )}
+                    {editingCode === item.code && editError && (
+                      <div className="error-list" role="status" aria-live="polite">
+                        {editError}
+                      </div>
+                    )}
                   </div>
                   <div>过期时间: {item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "-"}</div>
                   <div>消耗时间: {item.consumedAt ? new Date(item.consumedAt).toLocaleString() : "-"}</div>

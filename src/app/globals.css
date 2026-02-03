@@ -806,6 +806,24 @@ a.progress-link:hover {
   gap: 4px;
 }
 
+.detail-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.inline-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.input-compact {
+  padding: 8px 12px;
+  max-width: 160px;
+}
+
 .table-empty {
   padding: 16px;
   text-align: center;
