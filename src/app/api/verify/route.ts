@@ -10,56 +10,14 @@ type VerifyRequest = {
   cardKeys: string[];
 };
 
-const MAX_LINKS = 20;
-const MAX_REQUESTS = 10;
-const WINDOW_MS = 60_000;
-
-type RateRecord = {
-  count: number;
-  resetAt: number;
-};
-
-const globalForRateLimit = globalThis as unknown as {
-  verifyRateLimit?: Map<string, RateRecord>;
-};
-
-const rateStore = globalForRateLimit.verifyRateLimit ?? new Map<string, RateRecord>();
-globalForRateLimit.verifyRateLimit = rateStore;
-
-function getClientIp(headers: Headers) {
-  const forwarded = headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
-  return headers.get("x-real-ip") || "unknown";
-}
-
-function checkRateLimit(ip: string) {
-  const now = Date.now();
-  const record = rateStore.get(ip);
-  if (!record || now > record.resetAt) {
-    rateStore.set(ip, { count: 1, resetAt: now + WINDOW_MS });
-    return { allowed: true, retryAfter: 0 };
-  }
-  if (record.count >= MAX_REQUESTS) {
-    return { allowed: false, retryAfter: Math.ceil((record.resetAt - now) / 1000) };
-  }
-  record.count += 1;
-  rateStore.set(ip, record);
-  return { allowed: true, retryAfter: 0 };
-}
-
 export async function POST(request: Request) {
-  const ip = getClientIp(request.headers);
-  const rate = checkRateLimit(ip);
-  if (!rate.allowed) {
-    return Response.json(
-      { error: "请求过于频繁，请稍后再试" },
-      { status: 429, headers: { "Retry-After": String(rate.retryAfter) } }
-    );
-  }
-
   let payload: VerifyRequest;
+  const safeErrors = new Set([
+    "卡密不存在",
+    "卡密已过期",
+    "卡密不可用或已被锁定",
+    "卡密已消耗",
+  ]);
 
   try {
     payload = (await request.json()) as VerifyRequest;
@@ -71,15 +29,18 @@ export async function POST(request: Request) {
   if (!Array.isArray(links) || !Array.isArray(cardKeys)) {
     return Response.json({ error: "links 与 cardKeys 必须为数组" }, { status: 400 });
   }
-  if (links.length > MAX_LINKS) {
-    return Response.json(
-      { error: `最多支持 ${MAX_LINKS} 条链接` },
-      { status: 400 }
-    );
-  }
   if (links.length === 0 || links.length !== cardKeys.length) {
     return Response.json(
       { error: "links 与 cardKeys 数量不一致或为空" },
+      { status: 400 }
+    );
+  }
+  if (
+    links.some((link) => typeof link !== "string" || !link.trim()) ||
+    cardKeys.some((key) => typeof key !== "string" || !key.trim())
+  ) {
+    return Response.json(
+      { error: "links 与 cardKeys 必须为非空字符串" },
       { status: 400 }
     );
   }
@@ -95,8 +56,8 @@ export async function POST(request: Request) {
       };
 
       for (let i = 0; i < links.length; i += 1) {
-        const link = links[i];
-        const cardKey = cardKeys[i];
+        const link = String(links[i]).trim();
+        const cardKey = String(cardKeys[i]).trim();
         const verificationId = extractVerificationId(link);
 
         if (!verificationId) {
@@ -134,9 +95,15 @@ export async function POST(request: Request) {
           const result = await processVerification(job.id);
           send("result", { index: i, jobId: job.id, ...result });
         } catch (error) {
+          if (error instanceof Error && !safeErrors.has(error.message)) {
+            console.error("verify error", error);
+          }
           send("error", {
             index: i,
-            message: error instanceof Error ? error.message : "创建任务失败",
+            message:
+              error instanceof Error && safeErrors.has(error.message)
+                ? error.message
+                : "创建任务失败",
           });
         }
       }

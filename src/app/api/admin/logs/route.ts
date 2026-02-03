@@ -31,8 +31,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ logs, total, page, limit });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("admin logs list failed", error);
+    return NextResponse.json({ error: "查询失败" }, { status: 500 });
   }
 }
 
@@ -46,7 +46,7 @@ export async function DELETE(request: Request) {
     const result = await prisma.adminLog.deleteMany();
     return NextResponse.json({ success: true, deleted: result.count });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("admin logs delete failed", error);
+    return NextResponse.json({ error: "清理失败" }, { status: 500 });
   }
 }

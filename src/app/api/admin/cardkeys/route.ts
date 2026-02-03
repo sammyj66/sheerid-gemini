@@ -60,8 +60,8 @@ export async function GET(request: Request) {
       stats,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Database error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("admin cardkeys list failed", error);
+    return NextResponse.json({ error: "查询失败" }, { status: 500 });
   }
 }
 
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ keys });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "生成失败";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("admin cardkeys create failed", error);
+    return NextResponse.json({ error: "生成失败" }, { status: 500 });
   }
 }
