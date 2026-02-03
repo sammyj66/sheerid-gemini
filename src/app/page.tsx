@@ -57,65 +57,6 @@ export default function Home() {
     []
   );
 
-  const handleEvent = useCallback(
-    (eventName: string, payload: Record<string, unknown>) => {
-      const index = typeof payload.index === "number" ? payload.index : -1;
-      if (index < 0) return;
-
-      if (eventName === "queued") {
-        updateItem(index, {
-          status: "processing",
-          jobId: payload.jobId as string | undefined,
-          verificationId: payload.verificationId as string | undefined,
-          message: "已进入队列",
-        });
-        return;
-      }
-
-      if (eventName === "duplicate") {
-        updateItem(index, {
-          status: "duplicate",
-          jobId: payload.jobId as string | undefined,
-          resultUrl: payload.resultUrl as string | undefined,
-          verificationId: payload.verificationId as string | undefined,
-          message:
-            (payload.message as string | undefined) ||
-            "已验证过，直接返回历史结果",
-          keyStatus: payload.skipConsume ? "unused" : "consumed",
-        });
-        setRefreshToken((prev) => prev + 1);
-        refreshRemainingUses();
-        return;
-      }
-
-      if (eventName === "error") {
-        updateItem(index, {
-          status: "error",
-          message: payload.message as string | undefined,
-        });
-        setRefreshToken((prev) => prev + 1);
-        refreshRemainingUses();
-        return;
-      }
-
-      if (eventName === "result") {
-        const status = mapResultStatus(payload.status as string | undefined);
-        updateItem(index, {
-          status,
-          resultUrl: payload.resultUrl as string | undefined,
-          message: payload.message as string | undefined,
-          verificationId: payload.verificationId as string | undefined,
-          keyStatus: payload.skipConsume ? "unused" : undefined,
-        });
-        if (completedStatuses.has(status)) {
-          setRefreshToken((prev) => prev + 1);
-          refreshRemainingUses();
-        }
-      }
-    },
-    [refreshRemainingUses, updateItem]
-  );
-
   const queryRemainingUses = useCallback(async (cardKey: string) => {
     setRemainingLabel("查询中...");
     try {
@@ -173,6 +114,65 @@ export default function Home() {
       }
     },
     [refreshRemainingUses]
+  );
+
+  const handleEvent = useCallback(
+    (eventName: string, payload: Record<string, unknown>) => {
+      const index = typeof payload.index === "number" ? payload.index : -1;
+      if (index < 0) return;
+
+      if (eventName === "queued") {
+        updateItem(index, {
+          status: "processing",
+          jobId: payload.jobId as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+          message: "已进入队列",
+        });
+        return;
+      }
+
+      if (eventName === "duplicate") {
+        updateItem(index, {
+          status: "duplicate",
+          jobId: payload.jobId as string | undefined,
+          resultUrl: payload.resultUrl as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+          message:
+            (payload.message as string | undefined) ||
+            "已验证过，直接返回历史结果",
+          keyStatus: payload.skipConsume ? "unused" : "consumed",
+        });
+        setRefreshToken((prev) => prev + 1);
+        refreshRemainingUses();
+        return;
+      }
+
+      if (eventName === "error") {
+        updateItem(index, {
+          status: "error",
+          message: payload.message as string | undefined,
+        });
+        setRefreshToken((prev) => prev + 1);
+        refreshRemainingUses();
+        return;
+      }
+
+      if (eventName === "result") {
+        const status = mapResultStatus(payload.status as string | undefined);
+        updateItem(index, {
+          status,
+          resultUrl: payload.resultUrl as string | undefined,
+          message: payload.message as string | undefined,
+          verificationId: payload.verificationId as string | undefined,
+          keyStatus: payload.skipConsume ? "unused" : undefined,
+        });
+        if (completedStatuses.has(status)) {
+          setRefreshToken((prev) => prev + 1);
+          refreshRemainingUses();
+        }
+      }
+    },
+    [refreshRemainingUses, updateItem]
   );
 
   const parseSSE = useCallback(
