@@ -590,6 +590,15 @@ button {
   color: #cbd5f5;
 }
 
+a.progress-link {
+  color: var(--accent-2);
+  text-decoration: underline;
+}
+
+a.progress-link:hover {
+  color: #5eead4;
+}
+
 .copy-row {
   display: flex;
   align-items: center;

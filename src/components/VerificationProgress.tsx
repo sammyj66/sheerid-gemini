@@ -131,7 +131,14 @@ export default function VerificationProgress({
               {item.resultUrl && (
                 <div className="copy-row">
                   <span className="progress-meta">结果链接:</span>
-                  <span className="progress-link">{item.resultUrl}</span>
+                  <a
+                    className="progress-link"
+                    href={item.resultUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {item.resultUrl}
+                  </a>
                   <button
                     type="button"
                     className="copy-button"
