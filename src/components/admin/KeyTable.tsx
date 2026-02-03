@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import MaskedDateInput from "./MaskedDateInput";
 
@@ -112,7 +112,7 @@ export default function KeyTable({
     return params.toString();
   }, [filters]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -132,11 +132,11 @@ export default function KeyTable({
     } finally {
       setLoading(false);
     }
-  };
+  }, [queryParams]);
 
   useEffect(() => {
     loadData();
-  }, [queryParams, refreshToken]);
+  }, [loadData, refreshToken]);
 
   const selectedSet = useMemo(() => new Set(selectedCodes), [selectedCodes]);
   const allSelected =

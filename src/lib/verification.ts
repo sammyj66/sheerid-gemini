@@ -223,7 +223,7 @@ export async function processVerification(jobId: string) {
   if (!job) throw new Error("任务不存在");
 
   const startedAt = new Date();
-  let verificationId = job.verificationId ?? extractVerificationId(job.sheeridUrl);
+  const verificationId = job.verificationId ?? extractVerificationId(job.sheeridUrl);
 
   if (!verificationId) {
     return handleVerificationResult(jobId, {

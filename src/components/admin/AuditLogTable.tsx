@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 type AdminLog = {
   id: string;
@@ -23,7 +23,7 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
-  const loadLogs = async (targetPage = page) => {
+  const loadLogs = useCallback(async (targetPage = page) => {
     setLoading(true);
     try {
       const response = await fetch(
@@ -39,7 +39,7 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [limit, page]);
 
   const handleClearLogs = async () => {
     if (!confirm("确定清空所有审计日志吗？此操作不可恢复。")) return;
@@ -64,7 +64,7 @@ export default function AuditLogTable({ refreshToken }: AuditLogTableProps) {
 
   useEffect(() => {
     loadLogs();
-  }, [refreshToken]);
+  }, [loadLogs, refreshToken]);
 
   const actionLabelMap: Record<string, string> = {
     list_cardkeys: "查看卡密列表",

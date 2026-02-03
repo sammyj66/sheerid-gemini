@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import KeyGenerator from "@/components/admin/KeyGenerator";
 import KeyTable from "@/components/admin/KeyTable";
 import AuditLogTable from "@/components/admin/AuditLogTable";
@@ -14,6 +15,15 @@ type Stats = {
   expired: number;
 };
 
+const fetcher = async (url: string) => {
+  const response = await fetch(url, { credentials: "include" });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error((data as { error?: string })?.error || "加载失败");
+  }
+  return data as { stats?: Stats };
+};
+
 export default function AdminDashboardPage() {
   const [filters, setFilters] = useState({
     status: "ALL",
@@ -21,30 +31,23 @@ export default function AdminDashboardPage() {
     page: 1,
     limit: 20,
   });
-  const [stats, setStats] = useState<Stats | null>(null);
   const [statsRefreshToken, setStatsRefreshToken] = useState(0);
   const [listRefreshToken, setListRefreshToken] = useState(0);
 
-  const loadStats = useCallback(async () => {
+  const statsKey = useMemo(() => {
     const params = new URLSearchParams();
     params.set("status", filters.status);
     params.set("q", filters.query);
     params.set("includeStats", "1");
     params.set("page", "1");
     params.set("limit", "1");
+    params.set("refresh", String(statsRefreshToken));
 
-    const response = await fetch(`/api/admin/cardkeys?${params.toString()}`, {
-      credentials: "include",
-    });
-    const data = await response.json();
-    if (response.ok) {
-      setStats(data.stats);
-    }
-  }, [filters.status, filters.query]);
+    return `/api/admin/cardkeys?${params.toString()}`;
+  }, [filters.status, filters.query, statsRefreshToken]);
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats, statsRefreshToken]);
+  const { data: statsData } = useSWR(statsKey, fetcher);
+  const stats = statsData?.stats ?? null;
 
   const refreshStats = () => {
     setStatsRefreshToken((prev) => prev + 1);

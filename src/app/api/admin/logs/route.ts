@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/db";
-import { requireAdmin, getClientIp } from "@/lib/admin/auth";
-import { logAdminAction } from "@/lib/admin/audit";
+import { requireAdmin } from "@/lib/admin/auth";
 
 const MAX_LIMIT = 100;
 
