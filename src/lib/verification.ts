@@ -26,7 +26,7 @@ function sleep(ms: number) {
 
 function normalizeResult(payload: Record<string, unknown>): VerificationResult {
   const statusRaw = String(
-    payload.status ?? payload.state ?? payload.result ?? ""
+    payload.status ?? payload.state ?? payload.result ?? payload.currentStep ?? ""
   ).toUpperCase();
   const isSuccess =
     payload.success === true ||
@@ -46,6 +46,26 @@ function normalizeResult(payload: Record<string, unknown>): VerificationResult {
     verificationId: payload.verificationId as string | undefined,
     upstreamReqId: payload.upstreamReqId as string | undefined,
   };
+}
+
+function getStep(payload: Record<string, unknown>) {
+  return String(
+    payload.currentStep ??
+      payload.current_step ??
+      payload.status ??
+      payload.state ??
+      payload.result ??
+      ""
+  ).toLowerCase();
+}
+
+function isReviewPending(payload: Record<string, unknown>) {
+  const step = getStep(payload);
+  if (["pending", "processing", "queued", "review"].includes(step)) {
+    return true;
+  }
+  const message = String(payload.message ?? "");
+  return /document uploaded|waiting for review|awaiting review/i.test(message);
 }
 
 function toDateKey(date = new Date()) {
@@ -195,6 +215,7 @@ export async function processVerification(jobId: string) {
   const deadline = Date.now() + VERIFY_TIMEOUT_MS;
   let checkToken: string | undefined;
   let upstreamReqId: string | undefined;
+  let pendingDetected = false;
 
   try {
     const stream = await submitBatchVerification([verificationId], cdk);
@@ -234,6 +255,21 @@ export async function processVerification(jobId: string) {
       }
 
       if (event.event === "result") {
+        if (isReviewPending(payload)) {
+          pendingDetected = true;
+          checkToken ||= (payload.checkToken || payload.token) as
+            | string
+            | undefined;
+          await prisma.verificationJob.update({
+            where: { id: jobId },
+            data: {
+              status: "PENDING",
+              resultMessage: (payload.message as string | undefined) ?? null,
+            },
+          });
+          break;
+        }
+
         const result = normalizeResult(payload);
         result.verificationId ||= verificationId;
         result.upstreamReqId ||= upstreamReqId;
@@ -250,7 +286,10 @@ export async function processVerification(jobId: string) {
   if (checkToken) {
     while (Date.now() < deadline) {
       const pending = await checkPendingStatus(checkToken);
-      if (pending?.status === "pending" || pending?.status === "PROCESSING") {
+      const step = getStep(
+        typeof pending === "object" && pending ? pending : {}
+      );
+      if (["pending", "processing", "queued"].includes(step)) {
         await sleep(2000);
         continue;
       }
@@ -262,6 +301,13 @@ export async function processVerification(jobId: string) {
       result.upstreamReqId ||= upstreamReqId;
       return handleVerificationResult(jobId, result);
     }
+  }
+
+  if (pendingDetected) {
+    return handleVerificationResult(jobId, {
+      status: "TIMEOUT",
+      message: "等待审核中，未获取最终状态",
+    });
   }
 
   return handleVerificationResult(jobId, {
