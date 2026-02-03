@@ -165,6 +165,30 @@ export async function getCsrfToken(): Promise<CsrfSession> {
   const pageToken = extractCsrfTokenFromHtml(pageHtml);
   if (pageToken) return { token: pageToken, cookie };
 
+  const statusRes = await fetchWithTimeout(`${UPSTREAM_BASE}/api/status`, {
+    method: "GET",
+    headers: {
+      ...defaultHeaders,
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    cache: "no-store",
+  });
+
+  cookie = updateCookieFromResponse(statusRes, cookie);
+  const statusHeaderToken = statusRes.headers.get("x-csrf-token");
+  if (statusHeaderToken) return { token: statusHeaderToken, cookie };
+
+  const statusBody = await statusRes.text();
+  try {
+    const json = JSON.parse(statusBody);
+    if (typeof json?.csrfToken === "string") return { token: json.csrfToken, cookie };
+    if (typeof json?.token === "string") return { token: json.token, cookie };
+  } catch {
+    // continue
+  }
+  const statusToken = extractCsrfTokenFromHtml(statusBody);
+  if (statusToken) return { token: statusToken, cookie };
+
   const res = await fetchWithTimeout(`${UPSTREAM_BASE}/api/csrf`, {
     method: "GET",
     headers: {
