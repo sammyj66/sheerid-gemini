@@ -102,18 +102,23 @@ export async function POST(request: Request) {
     expiresAt = parsed;
   }
 
-  const keys = await generateKeys(count, {
-    expiresAt,
-    note: payload.note,
-    batchNo: payload.batchNo,
-    maxUses,
-  });
+  try {
+    const keys = await generateKeys(count, {
+      expiresAt,
+      note: payload.note,
+      batchNo: payload.batchNo,
+      maxUses,
+    });
 
-  await logAdminAction({
-    action: "create_cardkeys",
-    detail: `count=${count} batch=${payload.batchNo || ""}`,
-    ip: getClientIp(request.headers),
-  });
+    await logAdminAction({
+      action: "create_cardkeys",
+      detail: `count=${count} batch=${payload.batchNo || ""}`,
+      ip: getClientIp(request.headers),
+    });
 
-  return NextResponse.json({ keys });
+    return NextResponse.json({ keys });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "生成失败";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

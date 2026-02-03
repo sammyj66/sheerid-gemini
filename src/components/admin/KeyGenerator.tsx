@@ -17,8 +17,8 @@ function downloadFile(filename: string, content: string, type: string) {
 }
 
 export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
-  const [count, setCount] = useState(10);
-  const [maxUses, setMaxUses] = useState(1);
+  const [count, setCount] = useState("10");
+  const [maxUses, setMaxUses] = useState("1");
   const [batchNo, setBatchNo] = useState("");
   const [note, setNote] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -26,26 +26,84 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const clampNumericInput = (
+    value: string,
+    min: number,
+    max: number,
+    fallback: string
+  ) => {
+    if (!value) return fallback;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    const clamped = Math.min(max, Math.max(min, Math.floor(parsed)));
+    return String(clamped);
+  };
+
+  const parseExpiresAt = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    const normalized = trimmed.includes("T")
+      ? trimmed
+      : trimmed.replace(" ", "T");
+    const parsed = new Date(normalized);
+    if (Number.isNaN(parsed.getTime())) {
+      throw new Error("过期时间格式错误，请使用 YYYY-MM-DD HH:mm");
+    }
+    return parsed.toISOString();
+  };
+
   const handleGenerate = async () => {
     setError(null);
     setLoading(true);
     try {
+      const parsedCount = Number(count);
+      if (
+        !Number.isInteger(parsedCount) ||
+        parsedCount < 1 ||
+        parsedCount > 100
+      ) {
+        throw new Error("生成数量必须为 1-100 的整数");
+      }
+
+      const parsedMaxUses = Number(maxUses);
+      if (
+        !Number.isInteger(parsedMaxUses) ||
+        parsedMaxUses < 1 ||
+        parsedMaxUses > 1000
+      ) {
+        throw new Error("可验证次数必须为 1-1000 的整数");
+      }
+
+      const expiresAtIso = expiresAt ? parseExpiresAt(expiresAt) : undefined;
+
       const response = await fetch("/api/admin/cardkeys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          count,
-          maxUses,
+          count: parsedCount,
+          maxUses: parsedMaxUses,
           batchNo: batchNo || undefined,
           note: note || undefined,
-          expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+          expiresAt: expiresAtIso,
         }),
       });
 
-      const data = await response.json();
+      const text = await response.text();
+      let data: { error?: string; keys?: string[] } = {};
+      if (text) {
+        try {
+          data = JSON.parse(text) as typeof data;
+        } catch {
+          data = { error: text };
+        }
+      }
       if (!response.ok) {
         throw new Error(data?.error || "生成失败");
+      }
+
+      if (!data.keys) {
+        throw new Error("生成失败：服务端未返回卡密");
       }
 
       setGenerated(data.keys || []);
@@ -94,7 +152,17 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
             min={1}
             max={100}
             value={count}
-            onChange={(event) => setCount(Number(event.target.value))}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (!value) {
+                setCount("");
+                return;
+              }
+              setCount(value.replace(/^0+(?=\d)/, ""));
+            }}
+            onBlur={() =>
+              setCount((value) => clampNumericInput(value, 1, 100, "1"))
+            }
           />
         </div>
         <div className="field">
@@ -105,7 +173,17 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
             min={1}
             max={1000}
             value={maxUses}
-            onChange={(event) => setMaxUses(Number(event.target.value))}
+            onChange={(event) => {
+              const value = event.target.value;
+              if (!value) {
+                setMaxUses("");
+                return;
+              }
+              setMaxUses(value.replace(/^0+(?=\d)/, ""));
+            }}
+            onBlur={() =>
+              setMaxUses((value) => clampNumericInput(value, 1, 1000, "1"))
+            }
           />
         </div>
       </div>
@@ -123,7 +201,8 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
           <label className="label">过期时间 (可选)</label>
           <input
             className="input"
-            type="datetime-local"
+            type="text"
+            placeholder="YYYY-MM-DD HH:mm"
             value={expiresAt}
             onChange={(event) => setExpiresAt(event.target.value)}
           />
