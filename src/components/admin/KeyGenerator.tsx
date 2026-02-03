@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import MaskedDateInput from "./MaskedDateInput";
 
 type KeyGeneratorProps = {
   onGenerated?: () => void;
@@ -44,7 +45,9 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
     if (!trimmed) return undefined;
     const normalized = trimmed.includes("T")
       ? trimmed
-      : trimmed.replace(" ", "T");
+      : trimmed.includes(" ")
+        ? trimmed.replace(" ", "T")
+        : `${trimmed}T00:00`;
     const parsed = new Date(normalized);
     if (Number.isNaN(parsed.getTime())) {
       throw new Error("过期时间格式错误，请使用 YYYY-MM-DD HH:mm");
@@ -199,12 +202,10 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
         </div>
         <div className="field">
           <label className="label">过期时间 (可选)</label>
-          <input
+          <MaskedDateInput
             className="input"
-            type="text"
-            placeholder="YYYY-MM-DD HH:mm"
             value={expiresAt}
-            onChange={(event) => setExpiresAt(event.target.value)}
+            onChange={setExpiresAt}
           />
         </div>
       </div>
