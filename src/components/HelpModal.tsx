@@ -76,6 +76,16 @@ export default function HelpModal({ open, onClose }: HelpModalProps) {
             <li>失败或超时会自动回滚卡密状态。</li>
           </ul>
         </div>
+
+        <div>
+          <div className="card-title">一卡多链模式</div>
+          <ul className="helper-list">
+            <li>切换到“一卡多链”模式。</li>
+            <li>输入一张支持多次验证的卡密。</li>
+            <li>输入多条链接（不超过剩余次数）。</li>
+            <li>系统会依次处理每条链接。</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

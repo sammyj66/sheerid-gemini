@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { extractVerificationId, validateVerificationId } from "@/lib/validation";
 
 export type VerificationFormPayload = {
@@ -39,6 +39,8 @@ export default function VerificationForm({
   const [linksText, setLinksText] = useState("");
   const [keysText, setKeysText] = useState("");
   const [touched, setTouched] = useState(false);
+  const [remainingUses, setRemainingUses] = useState<number | null>(null);
+  const [cardKeyLoading, setCardKeyLoading] = useState(false);
 
   const validation = useMemo(() => {
     const links = parseLines(linksText);
@@ -78,6 +80,60 @@ export default function VerificationForm({
         issues.length === 0,
     };
   }, [linksText, keysText, pairMode]);
+
+  useEffect(() => {
+    if (pairMode !== "oneToMany") {
+      setRemainingUses(null);
+      return;
+    }
+    const cardKeys = parseLines(keysText);
+    if (cardKeys.length !== 1) {
+      setRemainingUses(null);
+      return;
+    }
+    let isActive = true;
+    const controller = new AbortController();
+
+    const fetchRemaining = async () => {
+      setCardKeyLoading(true);
+      try {
+        const response = await fetch("/api/query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cardKey: cardKeys[0] }),
+          signal: controller.signal,
+        });
+        const data = await response.json();
+        if (!isActive) return;
+        if (!response.ok || !data?.found) {
+          setRemainingUses(null);
+          return;
+        }
+        const remaining =
+          typeof data.remainingUses === "number"
+            ? data.remainingUses
+            : typeof data.maxUses === "number" && typeof data.usedCount === "number"
+              ? data.maxUses - data.usedCount
+              : null;
+        setRemainingUses(remaining);
+      } catch {
+        if (isActive) {
+          setRemainingUses(null);
+        }
+      } finally {
+        if (isActive) {
+          setCardKeyLoading(false);
+        }
+      }
+    };
+
+    fetchRemaining();
+
+    return () => {
+      isActive = false;
+      controller.abort();
+    };
+  }, [keysText, pairMode]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -182,6 +238,23 @@ export default function VerificationForm({
           rows={mode === "single" ? 3 : 6}
         />
         <div className="helper">已识别 {validation.cardKeys.length} 条卡密</div>
+        {pairMode === "oneToMany" && validation.cardKeys.length === 1 && (
+          <div className="helper">
+            {cardKeyLoading
+              ? "正在查询卡密剩余次数..."
+              : remainingUses !== null
+                ? `该卡密还可验证 ${remainingUses} 次`
+                : "未查询到卡密剩余次数"}
+          </div>
+        )}
+        {pairMode === "oneToMany" &&
+          remainingUses !== null &&
+          validation.links.length > 0 &&
+          remainingUses < validation.links.length && (
+            <div className="error-list" role="status" aria-live="polite">
+              当前卡密剩余次数不足，最多可验证 {remainingUses} 条链接
+            </div>
+          )}
       </div>
 
       {(validation.issues.length > 0 || validation.countMismatch) && (
