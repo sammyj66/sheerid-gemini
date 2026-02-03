@@ -23,7 +23,8 @@ export default function AdminDashboardPage() {
     limit: 20,
   });
   const [stats, setStats] = useState<Stats | null>(null);
-  const [refreshToken, setRefreshToken] = useState(0);
+  const [statsRefreshToken, setStatsRefreshToken] = useState(0);
+  const [listRefreshToken, setListRefreshToken] = useState(0);
 
   const loadStats = useCallback(async () => {
     const params = new URLSearchParams();
@@ -44,10 +45,19 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     loadStats();
-  }, [loadStats, refreshToken]);
+  }, [loadStats, statsRefreshToken]);
 
-  const handleUpdated = () => {
-    setRefreshToken((prev) => prev + 1);
+  const refreshStats = () => {
+    setStatsRefreshToken((prev) => prev + 1);
+  };
+
+  const refreshList = () => {
+    setListRefreshToken((prev) => prev + 1);
+  };
+
+  const handleGenerated = () => {
+    refreshStats();
+    refreshList();
   };
 
   return (
@@ -66,7 +76,7 @@ export default function AdminDashboardPage() {
 
         <section className="grid-two">
           <div className="card sticker-card">
-            <KeyGenerator onGenerated={handleUpdated} />
+            <KeyGenerator onGenerated={handleGenerated} />
           </div>
           <div className="card">
             <div className="card-header">
@@ -141,13 +151,13 @@ export default function AdminDashboardPage() {
           <KeyTable
             filters={filters}
             onFiltersChange={setFilters}
-            refreshToken={refreshToken}
-            onUpdated={handleUpdated}
+            refreshToken={listRefreshToken}
+            onUpdated={refreshStats}
           />
         </section>
 
         <section className="card">
-          <AuditLogTable refreshToken={refreshToken} />
+          <AuditLogTable refreshToken={statsRefreshToken} />
         </section>
       </div>
     </div>

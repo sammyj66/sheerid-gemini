@@ -546,6 +546,7 @@ button {
   padding: 4px 10px;
   border-radius: 999px;
   border: 1px solid transparent;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
 }
 
 .status-processing {
@@ -755,6 +756,7 @@ a.progress-link:hover {
   border-radius: var(--radius-md);
   border: 2px solid var(--border);
   background: rgba(10, 14, 26, 0.9);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .data-table-detail {

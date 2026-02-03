@@ -138,8 +138,6 @@ export default function KeyTable({
       setItems(prevItems);
       setTotal(prevTotal);
       alert(err instanceof Error ? err.message : "作废失败");
-    } finally {
-      loadData();
     }
   };
 
@@ -176,8 +174,6 @@ export default function KeyTable({
       setItems(prevItems);
       setTotal(prevTotal);
       alert(err instanceof Error ? err.message : "恢复失败");
-    } finally {
-      loadData();
     }
   };
 
