@@ -13,26 +13,41 @@ export async function DELETE(request: Request, context: Context) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const force = searchParams.get("force") === "true" || searchParams.get("force") === "1";
+
   const { code } = await context.params;
   if (!code) {
     return NextResponse.json({ error: "Missing code" }, { status: 400 });
   }
 
+  const cardKey = await prisma.cardKey.findUnique({ where: { code } });
+  if (!cardKey) {
+    return NextResponse.json({ error: "卡密不存在" }, { status: 404 });
+  }
+
   const jobCount = await prisma.verificationJob.count({
     where: { cardKeyCode: code },
   });
-  if (jobCount > 0) {
+
+  if (jobCount > 0 && !force) {
     return NextResponse.json(
-      { error: "该卡密已有验证记录，无法删除" },
+      {
+        error: "该卡密已有验证记录，确认后可强制删除",
+        jobCount,
+        usedCount: cardKey.usedCount,
+        remainingUses: cardKey.maxUses - cardKey.usedCount,
+      },
       { status: 409 }
     );
   }
 
-  try {
-    await prisma.cardKey.delete({ where: { code } });
-  } catch {
-    return NextResponse.json({ error: "卡密不存在" }, { status: 404 });
-  }
+  await prisma.$transaction(async (tx) => {
+    if (jobCount > 0) {
+      await tx.verificationJob.deleteMany({ where: { cardKeyCode: code } });
+    }
+    await tx.cardKey.delete({ where: { code } });
+  });
 
   await logAdminAction({
     action: "delete_cardkey",

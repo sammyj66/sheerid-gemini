@@ -605,14 +605,48 @@ export default function KeyTable({
   const isEditingField = (item: CardKey, field: EditField) =>
     editing?.code === item.code && editing.field === field;
 
-  const handleDelete = async (code: string) => {
-    if (!confirm(`确定删除卡密 ${code} 吗？`)) return;
-    const response = await fetch(`/api/admin/cardkeys/${code}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
+  const handleDelete = async (item: CardKey) => {
+    const remaining = (item.maxUses ?? 1) - (item.usedCount ?? 0);
+    const needsConfirm = (item.usedCount ?? 0) > 0;
+    if (
+      needsConfirm &&
+      !confirm(
+        `该卡密已被使用 ${item.usedCount ?? 0} 次，剩余 ${remaining} 次可用。是否确认删除？`
+      )
+    ) {
+      return;
+    }
+
+    const doDelete = async (force: boolean) => {
+      const response = await fetch(
+        `/api/admin/cardkeys/${item.code}${force ? "?force=1" : ""}`,
+        {
+          method: "DELETE",
+          credentials: "include",
+        }
+      );
+      const data = await response.json().catch(() => ({}));
+      return { response, data };
+    };
+
+    let { response, data } = await doDelete(needsConfirm);
     if (!response.ok) {
-      const data = await response.json();
+      if (response.status === 409 && data?.jobCount) {
+        const jobCount = data.jobCount as number;
+        const usedCount = data.usedCount ?? item.usedCount ?? 0;
+        const remainingUses = data.remainingUses ?? remaining;
+        const message = `该卡密已有 ${jobCount} 条验证记录，已使用 ${usedCount} 次，剩余 ${remainingUses} 次。是否确认强制删除？`;
+        if (confirm(message)) {
+          ({ response, data } = await doDelete(true));
+        } else {
+          return;
+        }
+      } else {
+        alert(data?.error || "删除失败");
+        return;
+      }
+    }
+    if (!response.ok) {
       alert(data?.error || "删除失败");
       return;
     }
@@ -871,7 +905,7 @@ export default function KeyTable({
                   <button
                     type="button"
                     className="ghost-button danger"
-                    onClick={() => handleDelete(item.code)}
+                    onClick={() => handleDelete(item)}
                   >
                     删除
                   </button>
