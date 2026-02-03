@@ -28,9 +28,12 @@ function normalizeResult(payload: Record<string, unknown>): VerificationResult {
   const statusRaw = String(
     payload.status ?? payload.state ?? payload.result ?? payload.currentStep ?? ""
   ).toUpperCase();
+  const message = String(payload.message ?? "");
   const isSuccess =
     payload.success === true ||
     statusRaw === "SUCCESS" ||
+    statusRaw === "PRECHECK_SUCCESS" ||
+    /verification already completed/i.test(message) ||
     Boolean(payload.resultUrl || payload.url);
 
   let status: VerificationResultStatus = "FAIL";
@@ -59,7 +62,17 @@ function getStep(payload: Record<string, unknown>) {
   ).toLowerCase();
 }
 
+function isAlreadyCompleted(payload: Record<string, unknown>) {
+  const step = getStep(payload);
+  if (step === "precheck_success" || step === "completed") {
+    return true;
+  }
+  const message = String(payload.message ?? "");
+  return /verification already completed/i.test(message);
+}
+
 function isReviewPending(payload: Record<string, unknown>) {
+  if (isAlreadyCompleted(payload)) return false;
   const step = getStep(payload);
   if (["pending", "processing", "queued", "review"].includes(step)) {
     return true;
