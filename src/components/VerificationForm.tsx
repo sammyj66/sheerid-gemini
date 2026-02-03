@@ -35,6 +35,7 @@ export default function VerificationForm({
   onSubmit,
 }: VerificationFormProps) {
   const [mode, setMode] = useState<"single" | "batch">("single");
+  const [pairMode, setPairMode] = useState<"oneToOne" | "oneToMany">("oneToOne");
   const [linksText, setLinksText] = useState("");
   const [keysText, setKeysText] = useState("");
   const [touched, setTouched] = useState(false);
@@ -60,7 +61,9 @@ export default function VerificationForm({
     });
 
     const countMismatch =
-      links.length > 0 && cardKeys.length > 0 && links.length !== cardKeys.length;
+      pairMode === "oneToOne"
+        ? links.length > 0 && cardKeys.length > 0 && links.length !== cardKeys.length
+        : cardKeys.length !== 1 || links.length === 0;
 
     return {
       links,
@@ -74,7 +77,7 @@ export default function VerificationForm({
         !countMismatch &&
         issues.length === 0,
     };
-  }, [linksText, keysText]);
+  }, [linksText, keysText, pairMode]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -82,15 +85,20 @@ export default function VerificationForm({
     if (!validation.canSubmit) return;
     await onSubmit({
       links: validation.links,
-      cardKeys: validation.cardKeys,
+      cardKeys:
+        pairMode === "oneToMany"
+          ? Array(validation.links.length).fill(validation.cardKeys[0])
+          : validation.cardKeys,
       verificationIds: validation.verificationIds,
     });
   };
 
   const helperText =
-    mode === "single"
-      ? "单条模式下仅需填写一条链接和一条卡密"
-      : "批量模式支持多行，一行一个链接/卡密";
+    pairMode === "oneToMany"
+      ? "一卡多链模式：输入一张多次使用的卡密，可验证多个链接"
+      : mode === "single"
+        ? "单条模式下仅需填写一条链接和一条卡密"
+        : "批量模式支持多行，一行一个链接/卡密";
 
   return (
     <form className="form" onSubmit={handleSubmit}>
@@ -121,6 +129,32 @@ export default function VerificationForm({
       </div>
 
       <div className="field">
+        <label className="label">配对模式</label>
+        <div
+          className={`mode-toggle ${pairMode === "oneToOne" ? "single" : "batch"}`}
+          role="tablist"
+        >
+          <span className="mode-slider" />
+          <button
+            type="button"
+            className={`mode-button ${pairMode === "oneToOne" ? "active" : ""}`}
+            aria-pressed={pairMode === "oneToOne"}
+            onClick={() => setPairMode("oneToOne")}
+          >
+            一卡一链
+          </button>
+          <button
+            type="button"
+            className={`mode-button ${pairMode === "oneToMany" ? "active" : ""}`}
+            aria-pressed={pairMode === "oneToMany"}
+            onClick={() => setPairMode("oneToMany")}
+          >
+            一卡多链
+          </button>
+        </div>
+      </div>
+
+      <div className="field">
         <label className="label">SheerID 链接</label>
         <textarea
           className="textarea"
@@ -138,7 +172,11 @@ export default function VerificationForm({
         <label className="label">卡密</label>
         <textarea
           className="textarea"
-          placeholder="粘贴卡密，多条请换行"
+          placeholder={
+            pairMode === "oneToMany"
+              ? "一卡多链模式下仅需填写一条卡密"
+              : "粘贴卡密，多条请换行"
+          }
           value={keysText}
           onChange={(event) => setKeysText(normalizeInput(event.target.value))}
           rows={mode === "single" ? 3 : 6}
@@ -149,7 +187,11 @@ export default function VerificationForm({
       {(validation.issues.length > 0 || validation.countMismatch) && (
         <div className="error-list" role="status" aria-live="polite">
           {validation.countMismatch && (
-            <div>链接数量必须与卡密数量一致</div>
+            <div>
+              {pairMode === "oneToMany"
+                ? "一卡多链模式需要 1 条卡密 + 至少 1 条链接"
+                : "链接数量必须与卡密数量一致"}
+            </div>
           )}
           {(touched || validation.issues.length > 0) &&
             validation.issues.map((issue) => (
