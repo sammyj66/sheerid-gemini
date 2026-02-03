@@ -44,13 +44,14 @@ function extractCsrfTokenFromHtml(html: string): string | null {
   return null;
 }
 
-function getSetCookieHeader(res: Response): string | null {
+function getSetCookieValues(res: Response): string[] {
   const headers = res.headers as Headers & { getSetCookie?: () => string[] };
   if (typeof headers.getSetCookie === "function") {
-    const values = headers.getSetCookie();
-    return values.length ? values.join(",") : null;
+    return headers.getSetCookie();
   }
-  return res.headers.get("set-cookie");
+  const header = res.headers.get("set-cookie");
+  if (!header) return [];
+  return header.split(/,(?=[^;]+?=)/);
 }
 
 function extractTokenFromCookies(cookieHeader: string | undefined | null) {
@@ -73,10 +74,9 @@ function extractTokenFromCookies(cookieHeader: string | undefined | null) {
   return null;
 }
 
-function extractTokenFromSetCookie(setCookie: string | null) {
-  if (!setCookie) return null;
-  const parts = setCookie.split(/,(?=[^;]+?=)/);
-  for (const part of parts) {
+function extractTokenFromSetCookie(setCookies: string[]) {
+  if (setCookies.length === 0) return null;
+  for (const part of setCookies) {
     const [cookiePair] = part.split(";");
     const token = extractTokenFromCookies(cookiePair);
     if (token) return token;
@@ -84,24 +84,45 @@ function extractTokenFromSetCookie(setCookie: string | null) {
   return null;
 }
 
-function mergeCookieHeader(existing: string | undefined, setCookie: string | null) {
-  if (!setCookie) return existing;
-  const merged = [
-    ...(existing ? existing.split(";").map((item) => item.trim()).filter(Boolean) : []),
-    ...setCookie
-      .split(",")
-      .map((part) => part.split(";")[0].trim())
-      .filter(Boolean),
-  ];
-  return merged.length ? merged.join("; ") : undefined;
+function normalizeCookiePairs(cookies: string[]) {
+  return cookies
+    .map((part) => part.split(";")[0].trim())
+    .filter(Boolean);
+}
+
+function mergeCookieHeader(existing: string | undefined, setCookies: string[]) {
+  if (setCookies.length === 0) return existing;
+  const map = new Map<string, string>();
+  const consumePair = (pair: string) => {
+    const index = pair.indexOf("=");
+    if (index <= 0) return;
+    const name = pair.slice(0, index).trim();
+    const value = pair.slice(index + 1);
+    if (name) map.set(name, value);
+  };
+
+  if (existing) {
+    existing
+      .split(";")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .forEach(consumePair);
+  }
+
+  normalizeCookiePairs(setCookies).forEach(consumePair);
+
+  if (map.size === 0) return existing;
+  return Array.from(map.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
 }
 
 function updateCookieFromResponse(
   res: Response,
   currentCookie: string | undefined
 ) {
-  const setCookie = res.headers.get("set-cookie");
-  return mergeCookieHeader(currentCookie, setCookie);
+  const setCookies = getSetCookieValues(res);
+  return mergeCookieHeader(currentCookie, setCookies);
 }
 
 export type CsrfSession = {
@@ -123,7 +144,11 @@ export async function getCsrfToken(): Promise<CsrfSession> {
     cache: "no-store",
   });
   let cookie = updateCookieFromResponse(pageRes, undefined);
-  const pageSetCookieToken = extractTokenFromSetCookie(getSetCookieHeader(pageRes));
+  const pageHeaderToken = pageRes.headers.get("x-csrf-token");
+  if (pageHeaderToken) {
+    return { token: pageHeaderToken, cookie };
+  }
+  const pageSetCookieToken = extractTokenFromSetCookie(getSetCookieValues(pageRes));
   if (pageSetCookieToken) {
     return { token: pageSetCookieToken, cookie };
   }
@@ -142,7 +167,7 @@ export async function getCsrfToken(): Promise<CsrfSession> {
   });
 
   cookie = updateCookieFromResponse(res, cookie);
-  const apiSetCookieToken = extractTokenFromSetCookie(getSetCookieHeader(res));
+  const apiSetCookieToken = extractTokenFromSetCookie(getSetCookieValues(res));
   if (apiSetCookieToken) return { token: apiSetCookieToken, cookie };
 
   const body = await res.text();
