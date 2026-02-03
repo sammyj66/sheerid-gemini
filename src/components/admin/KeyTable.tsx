@@ -106,30 +106,79 @@ export default function KeyTable({
   };
 
   const handleRevoke = async (code: string) => {
-    await fetch(`/api/admin/cardkeys/${code}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ action: "revoke" }),
-    });
-    await loadData();
-    onUpdated();
+    const prevItems = items;
+    const prevTotal = total;
+    const shouldRemove =
+      filters.status !== "ALL" && filters.status !== "REVOKED";
+
+    if (shouldRemove) {
+      setItems((prev) => prev.filter((item) => item.code !== code));
+      setTotal((prev) => Math.max(0, prev - 1));
+    } else {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.code === code ? { ...item, status: "REVOKED" } : item
+        )
+      );
+    }
+
+    try {
+      const response = await fetch(`/api/admin/cardkeys/${code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "revoke" }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as { error?: string })?.error || "作废失败");
+      }
+      onUpdated();
+    } catch (err) {
+      setItems(prevItems);
+      setTotal(prevTotal);
+      alert(err instanceof Error ? err.message : "作废失败");
+    } finally {
+      loadData();
+    }
   };
 
   const handleRestore = async (code: string) => {
-    const response = await fetch(`/api/admin/cardkeys/${code}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ action: "restore" }),
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      alert((data as { error?: string })?.error || "恢复失败");
-      return;
+    const prevItems = items;
+    const prevTotal = total;
+    const shouldRemove =
+      filters.status !== "ALL" && filters.status !== "UNUSED";
+
+    if (shouldRemove) {
+      setItems((prev) => prev.filter((item) => item.code !== code));
+      setTotal((prev) => Math.max(0, prev - 1));
+    } else {
+      setItems((prev) =>
+        prev.map((item) =>
+          item.code === code ? { ...item, status: "UNUSED" } : item
+        )
+      );
     }
-    await loadData();
-    onUpdated();
+
+    try {
+      const response = await fetch(`/api/admin/cardkeys/${code}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ action: "restore" }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error((data as { error?: string })?.error || "恢复失败");
+      }
+      onUpdated();
+    } catch (err) {
+      setItems(prevItems);
+      setTotal(prevTotal);
+      alert(err instanceof Error ? err.message : "恢复失败");
+    } finally {
+      loadData();
+    }
   };
 
   const handleCopy = async (code: string) => {
@@ -263,14 +312,7 @@ export default function KeyTable({
                   >
                     详情
                   </button>
-                  <button
-                    type="button"
-                    className="ghost-button"
-                    onClick={() => handleRevoke(item.code)}
-                  >
-                    作废
-                  </button>
-                  {item.status === "REVOKED" && (
+                  {item.status === "REVOKED" ? (
                     <button
                       type="button"
                       className="ghost-button"
@@ -278,7 +320,15 @@ export default function KeyTable({
                     >
                       恢复
                     </button>
-                  )}
+                  ) : item.status === "UNUSED" || item.status === "CONSUMED" ? (
+                    <button
+                      type="button"
+                      className="ghost-button"
+                      onClick={() => handleRevoke(item.code)}
+                    >
+                      作废
+                    </button>
+                  ) : null}
                   <button
                     type="button"
                     className="ghost-button danger"
