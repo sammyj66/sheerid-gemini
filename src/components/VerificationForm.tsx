@@ -34,7 +34,6 @@ export default function VerificationForm({
   isSubmitting,
   onSubmit,
 }: VerificationFormProps) {
-  const [mode, setMode] = useState<"single" | "batch">("single");
   const [pairMode, setPairMode] = useState<"oneToOne" | "oneToMany">("oneToOne");
   const [linksText, setLinksText] = useState("");
   const [keysText, setKeysText] = useState("");
@@ -152,9 +151,7 @@ export default function VerificationForm({
   const helperText =
     pairMode === "oneToMany"
       ? "一卡多链模式：输入一张多次使用的卡密，可验证多个链接"
-      : mode === "single"
-        ? "单条模式下仅需填写一条链接和一条卡密"
-        : "批量模式支持多行，一行一个链接/卡密";
+      : "一卡一链模式：每条链接对应一条卡密，多行可批量提交";
 
   return (
     <form className="form" onSubmit={handleSubmit}>
@@ -162,25 +159,6 @@ export default function VerificationForm({
         <div>
           <div className="card-title">提交验证</div>
           <div className="card-note">{helperText}</div>
-        </div>
-        <div className={`mode-toggle ${mode}`} role="tablist">
-          <span className="mode-slider" />
-          <button
-            type="button"
-            className={`mode-button ${mode === "single" ? "active" : ""}`}
-            aria-pressed={mode === "single"}
-            onClick={() => setMode("single")}
-          >
-            单条
-          </button>
-          <button
-            type="button"
-            className={`mode-button ${mode === "batch" ? "active" : ""}`}
-            aria-pressed={mode === "batch"}
-            onClick={() => setMode("batch")}
-          >
-            批量
-          </button>
         </div>
       </div>
 
@@ -217,7 +195,7 @@ export default function VerificationForm({
           placeholder="粘贴 SheerID 验证链接，多条请换行"
           value={linksText}
           onChange={(event) => setLinksText(normalizeInput(event.target.value))}
-          rows={mode === "single" ? 3 : 6}
+          rows={6}
         />
         <div className="helper">
           已识别 {validation.links.length} 条链接
@@ -235,7 +213,7 @@ export default function VerificationForm({
           }
           value={keysText}
           onChange={(event) => setKeysText(normalizeInput(event.target.value))}
-          rows={mode === "single" ? 3 : 6}
+          rows={6}
         />
         <div className="helper">已识别 {validation.cardKeys.length} 条卡密</div>
         {pairMode === "oneToMany" && validation.cardKeys.length === 1 && (
