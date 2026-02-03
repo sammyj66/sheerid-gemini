@@ -9,8 +9,9 @@ ENV DATABASE_URL="file:./dev.db"
 
 COPY package*.json ./
 RUN npm ci
-COPY . .
+COPY prisma ./prisma
 RUN npx prisma generate
+COPY . .
 RUN npm run build
 
 FROM node:20-slim AS runner
