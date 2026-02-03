@@ -1,27 +1,25 @@
 # Gemini 学生认证平台
 
-Gemini 学生认证平台 - 使用卡密激活 SheerID 学生验证。
+Gemini 学生认证平台，用卡密激活 SheerID 学生验证，前台支持实时进度（SSE），管理端支持卡密生成、管理与审计。
 
-## 功能特性
-- 单条 / 批量验证
-- 实时进度显示（SSE）
-- 管理后台与审计日志
-- 卡密生成、搜索、撤销与导出
+> 说明：由于当前上游接口偶发返回 **502**，部分真实验证流程无法在本地完整回归测试。代码已按规范完成并增强了上游 CSRF 获取逻辑，需在上游可用环境验证。
 
-## 技术栈
-- Next.js（当前版本 16.1.6）
-- TypeScript
-- Prisma + SQLite
-- CSS：原生 CSS（无 Tailwind 依赖，可按需接入 TailwindCSS）
+## 已实现功能
+- 前台验证：一卡一链 / 一卡多链
+- SSE 实时进度展示（含结果链接）
+- 卡密剩余次数查询与展示
+- 验证成功扣费、失败/超时不扣费
+- 管理端登录认证（Cookie 会话）
+- 卡密 CRUD、批量导出、批量作废/删除
+- 审计日志查看与清空
+- Prisma + SQLite 数据库
+- Docker 部署与 standalone 输出
 
-## 使用教程（用户端）
-1. 获取 SheerID 验证链接。
-2. 粘贴链接与卡密，选择“单条 / 批量”。
-3. 提交验证后在“验证进度”中查看实时状态与结果链接。
-
-## 使用教程（管理端）
-1. 访问 `/admin/login` 使用管理员密码登录。
-2. 在后台生成卡密、查看状态、导出记录与审计日志。
+## 项目结构
+- `src/app`：页面与 API 路由
+- `src/components`：前端组件
+- `src/lib`：业务逻辑与上游请求
+- `prisma`：数据模型与迁移
 
 ## 本地开发
 ```bash
@@ -29,104 +27,95 @@ npm install
 npm run dev
 ```
 
-## Docker 部署（本地）
+## 生产部署（Docker）
 ```bash
 docker-compose up -d --build
 ```
 
-## VPS 部署（Docker + Nginx + Cloudflare）
-> 以下为通用流程，请使用你自己的域名与服务器地址。
-
-### 1) 上传代码到 VPS
-方式一（推荐）：在 VPS 上 `git clone` / `git pull`
-
-方式二（rsync）：
+## 生产部署（PM2）
 ```bash
-rsync -avz --exclude node_modules --exclude .next --exclude .git \
-  ./ root@YOUR_VPS_IP:/var/www/your_project/
-```
+npm ci
+npx prisma generate
+npm run build
 
-### 2) VPS 环境准备
-```bash
-# 安装 Docker
-curl -fsSL https://get.docker.com | sh
+# 生产数据库迁移（首次部署执行）
+npx prisma migrate deploy
 
-# 安装 docker-compose
-sudo apt install docker-compose -y
-
-# 创建数据目录
-mkdir -p /var/www/your_project/data
-```
-
-### 3) 配置环境变量
-```bash
-cd /var/www/your_project
-cat > .env << EOF
-DATABASE_URL="file:./data/prod.db"
-UPSTREAM_CDK="your_cdk_here"
-ADMIN_PASSWORD="your_admin_password_here"
-EOF
-```
-
-### 4) 启动应用（对应 tasks 的“步骤 5”）
-```bash
-cd /var/www/your_project
-docker-compose up -d --build
-
-# 查看日志
-docker-compose logs -f
-```
-
-### 5) 配置 Nginx 反代（支持 SSE）
-```nginx
-server {
-    listen 80;
-    listen 443 ssl http2;
-    server_name your-domain.example.com;
-
-    # 如使用 Cloudflare Full 模式可使用自签名证书
-    ssl_certificate /etc/nginx/ssl/selfsigned.crt;
-    ssl_certificate_key /etc/nginx/ssl/selfsigned.key;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-
-        # SSE 支持
-        proxy_buffering off;
-        proxy_read_timeout 86400;
-    }
-}
-```
-
-启用站点：
-```bash
-ln -s /etc/nginx/sites-available/your_project /etc/nginx/sites-enabled/
-nginx -t
-systemctl reload nginx
-```
-
-### 6) 证书与 Cloudflare
-- Cloudflare SSL/TLS 设置选择 **Full**（或 Full Strict）。
-- 开启 Always Use HTTPS。
-
-### 7) 数据库迁移
-```bash
-docker-compose exec app npx prisma migrate deploy
+# 启动
+pm2 start npm --name sheerid-gemini -- start
 ```
 
 ## 环境变量
-请在 `.env` 中配置以下变量（使用占位符示例，不要填写真实密钥）：
+请在 `.env` 中配置以下变量（示例，不含真实密钥）：
 
 ```bash
 DATABASE_URL="file:./dev.db"
 UPSTREAM_CDK="your_cdk_here"
-ADMIN_PASSWORD="your_admin_password_here"
+UPSTREAM_BASE="https://neigui.1key.me"
+ADMIN_PASSWORD="your_admin_password"
+TZ="Asia/Shanghai"
 ```
+
+## 使用说明
+### 前台验证
+1. 获取 SheerID 验证链接（右键复制链接地址）。
+2. 选择模式：
+   - 一卡一链：链接数量 = 卡密数量
+   - 一卡多链：1 个卡密 + 多条链接（不超过剩余次数）
+3. 点击“开始验证”，在“验证进度”查看实时状态与结果链接。
+
+### 管理端
+1. 访问 `/admin/login`
+2. 输入 `ADMIN_PASSWORD` 登录
+3. 生成卡密、批量操作、导出、查看审计日志
+
+## API 使用说明
+> 以下为主要接口概要，详情请结合源码与 `api .json` 参考。
+
+### 1) 验证接口（SSE）
+`POST /api/verify`
+
+请求体：
+```json
+{
+  "links": ["https://services.sheerid.com/verify/..."],
+  "cardKeys": ["YOUR_CARD_KEY"]
+}
+```
+
+返回：`text/event-stream`  
+事件类型：`queued` / `result` / `error` / `duplicate`
+
+### 2) 查询卡密/验证状态
+`POST /api/query`
+
+请求体：
+```json
+{
+  "cardKey": "YOUR_CARD_KEY"
+}
+```
+
+返回示例：
+```json
+{
+  "found": true,
+  "status": "UNUSED",
+  "maxUses": 3,
+  "usedCount": 1,
+  "remainingUses": 2
+}
+```
+
+### 3) 管理端接口（需登录 Cookie）
+- `POST /api/admin/login`
+- `GET /api/admin/cardkeys`
+- `POST /api/admin/cardkeys`
+- `PATCH /api/admin/cardkeys/[code]`
+- `DELETE /api/admin/cardkeys/[code]`
+- `GET /api/admin/logs`
+- `DELETE /api/admin/logs`
+
+## 已知限制
+- 上游 `neigui.1key.me` 在部分环境返回 502，导致 CSRF Token 无法获取，真实验证流程需在上游可用环境验证。
+
