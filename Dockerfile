@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 ENV DATABASE_URL="file:./dev.db"
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY prisma ./prisma
 RUN npx prisma generate
 COPY . .
