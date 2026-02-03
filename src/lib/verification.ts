@@ -127,8 +127,24 @@ export async function createVerificationJob(
   const verificationId = extractVerificationId(sheeridUrl);
 
   return prisma.$transaction(async (tx) => {
+    const cardKey = await tx.cardKey.findUnique({ where: { code: cardKeyCode } });
+    if (!cardKey) {
+      throw new Error("卡密不存在");
+    }
+    if (cardKey.status !== "UNUSED") {
+      throw new Error("卡密不可用或已被锁定");
+    }
+    if (cardKey.usedCount >= cardKey.maxUses) {
+      throw new Error("卡密已消耗");
+    }
+
     const locked = await tx.cardKey.updateMany({
-      where: { code: cardKeyCode, status: "UNUSED" },
+      where: {
+        code: cardKeyCode,
+        status: "UNUSED",
+        usedCount: cardKey.usedCount,
+        maxUses: cardKey.maxUses,
+      },
       data: {
         status: "LOCKED",
         lockedAt: new Date(),

@@ -5,6 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 type CardKey = {
   code: string;
   status: string;
+  maxUses: number;
+  usedCount: number;
   batchNo: string | null;
   note: string | null;
   createdAt: string;
@@ -283,6 +285,9 @@ export default function KeyTable({
     const header = [
       "code",
       "status",
+      "maxUses",
+      "usedCount",
+      "remaining",
       "batchNo",
       "note",
       "createdAt",
@@ -292,6 +297,9 @@ export default function KeyTable({
     const rows = selectedItems.map((item) => [
       item.code,
       statusLabelMap[item.status] || item.status,
+      String(item.maxUses ?? 1),
+      String(item.usedCount ?? 0),
+      String((item.maxUses ?? 1) - (item.usedCount ?? 0)),
       item.batchNo || "",
       item.note || "",
       item.createdAt,
@@ -474,6 +482,7 @@ export default function KeyTable({
           </span>
           <span>卡密</span>
           <span>状态</span>
+          <span>次数</span>
           <span>批次号</span>
           <span>创建时间</span>
           <span>操作</span>
@@ -514,6 +523,9 @@ export default function KeyTable({
                 </span>
                 <span className={`status-badge ${statusPillMap[item.status]}`}>
                   {statusLabelMap[item.status] || item.status}
+                </span>
+                <span>
+                  {item.usedCount ?? 0}/{item.maxUses ?? 1}
                 </span>
                 <span>{item.batchNo || "-"}</span>
                 <span>{new Date(item.createdAt).toLocaleString()}</span>
@@ -556,6 +568,12 @@ export default function KeyTable({
               {expanded === item.code && (
                 <div className="data-table-detail">
                   <div>备注: {item.note || "-"}</div>
+                  <div>
+                    已用次数: {item.usedCount ?? 0} / {item.maxUses ?? 1}
+                  </div>
+                  <div>
+                    剩余次数: {(item.maxUses ?? 1) - (item.usedCount ?? 0)}
+                  </div>
                   <div>过期时间: {item.expiresAt ? new Date(item.expiresAt).toLocaleString() : "-"}</div>
                   <div>消耗时间: {item.consumedAt ? new Date(item.consumedAt).toLocaleString() : "-"}</div>
                 </div>

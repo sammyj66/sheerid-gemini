@@ -10,6 +10,8 @@ model CardKey {
   id           String     @id @default(cuid())
   code         String     @unique
   status       CardStatus @default(UNUSED)
+  maxUses      Int        @default(1)
+  usedCount    Int        @default(0)
   batchNo      String?
   note         String?
   createdAt    DateTime   @default(now())

@@ -86,6 +86,7 @@ export async function PATCH(request: Request, context: Context) {
         status: "UNUSED",
         consumedAt: null,
         consumedBy: null,
+        usedCount: 0,
         lockedAt: null,
         lockJobId: null,
       },

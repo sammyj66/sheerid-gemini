@@ -18,6 +18,7 @@ function downloadFile(filename: string, content: string, type: string) {
 
 export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
   const [count, setCount] = useState(10);
+  const [maxUses, setMaxUses] = useState(1);
   const [batchNo, setBatchNo] = useState("");
   const [note, setNote] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -35,6 +36,7 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
         credentials: "include",
         body: JSON.stringify({
           count,
+          maxUses,
           batchNo: batchNo || undefined,
           note: note || undefined,
           expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
@@ -83,16 +85,29 @@ export default function KeyGenerator({ onGenerated }: KeyGeneratorProps) {
         </div>
       </div>
 
-      <div className="field">
-        <label className="label">生成数量 (1-100)</label>
-        <input
-          className="input"
-          type="number"
-          min={1}
-          max={100}
-          value={count}
-          onChange={(event) => setCount(Number(event.target.value))}
-        />
+      <div className="grid-two">
+        <div className="field">
+          <label className="label">生成数量 (1-100)</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={100}
+            value={count}
+            onChange={(event) => setCount(Number(event.target.value))}
+          />
+        </div>
+        <div className="field">
+          <label className="label">可验证次数 (1-1000)</label>
+          <input
+            className="input"
+            type="number"
+            min={1}
+            max={1000}
+            value={maxUses}
+            onChange={(event) => setMaxUses(Number(event.target.value))}
+          />
+        </div>
       </div>
 
       <div className="grid-two">

@@ -42,6 +42,9 @@ export async function GET(request: Request) {
   const header = [
     "code",
     "status",
+    "maxUses",
+    "usedCount",
+    "remaining",
     "batchNo",
     "note",
     "createdAt",
@@ -52,6 +55,9 @@ export async function GET(request: Request) {
     [
       key.code,
       key.status,
+      String(key.maxUses ?? 1),
+      String(key.usedCount ?? 0),
+      String((key.maxUses ?? 1) - (key.usedCount ?? 0)),
       key.batchNo,
       key.note,
       key.createdAt.toISOString(),

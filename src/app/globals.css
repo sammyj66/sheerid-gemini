@@ -757,7 +757,14 @@ a.progress-link:hover {
 .data-table-head,
 .data-table-row {
   display: grid;
-  grid-template-columns: 36px minmax(160px, 1.3fr) minmax(120px, 0.8fr) minmax(120px, 0.8fr) minmax(160px, 1fr) minmax(200px, 1fr);
+  grid-template-columns:
+    36px
+    minmax(160px, 1.3fr)
+    minmax(120px, 0.8fr)
+    minmax(110px, 0.7fr)
+    minmax(120px, 0.8fr)
+    minmax(160px, 1fr)
+    minmax(200px, 1fr);
   gap: 12px;
   align-items: center;
 }

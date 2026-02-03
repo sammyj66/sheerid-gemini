@@ -68,6 +68,7 @@ export async function POST(request: Request) {
     expiresAt?: string;
     note?: string;
     batchNo?: string;
+    maxUses?: number;
   } = {};
 
   try {
@@ -80,6 +81,14 @@ export async function POST(request: Request) {
   if (!Number.isInteger(count) || count < 1 || count > 100) {
     return NextResponse.json(
       { error: "count 必须为 1-100 的整数" },
+      { status: 400 }
+    );
+  }
+
+  const maxUses = Number(payload.maxUses ?? 1);
+  if (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 1000) {
+    return NextResponse.json(
+      { error: "maxUses 必须为 1-1000 的整数" },
       { status: 400 }
     );
   }
@@ -97,6 +106,7 @@ export async function POST(request: Request) {
     expiresAt,
     note: payload.note,
     batchNo: payload.batchNo,
+    maxUses,
   });
 
   await logAdminAction({

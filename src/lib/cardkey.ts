@@ -5,6 +5,7 @@ type GenerateKeyOptions = {
   expiresAt?: Date;
   note?: string;
   batchNo?: string;
+  maxUses?: number;
 };
 
 export async function generateKeys(count: number, options: GenerateKeyOptions = {}) {
@@ -14,6 +15,7 @@ export async function generateKeys(count: number, options: GenerateKeyOptions = 
     expiresAt: options.expiresAt,
     note: options.note,
     batchNo: options.batchNo,
+    maxUses: options.maxUses ?? 1,
   }));
 
   await prisma.cardKey.createMany({ data });
@@ -21,8 +23,24 @@ export async function generateKeys(count: number, options: GenerateKeyOptions = 
 }
 
 export async function lockKey(code: string, jobId: string) {
+  const cardKey = await prisma.cardKey.findUnique({ where: { code } });
+  if (!cardKey) {
+    throw new Error("卡密不存在");
+  }
+  if (cardKey.status !== "UNUSED") {
+    throw new Error("卡密不可用或已被锁定");
+  }
+  if (cardKey.usedCount >= cardKey.maxUses) {
+    throw new Error("卡密已消耗");
+  }
+
   const result = await prisma.cardKey.updateMany({
-    where: { code, status: "UNUSED" },
+    where: {
+      code,
+      status: "UNUSED",
+      usedCount: cardKey.usedCount,
+      maxUses: cardKey.maxUses,
+    },
     data: {
       status: "LOCKED",
       lockedAt: new Date(),
@@ -36,11 +54,22 @@ export async function lockKey(code: string, jobId: string) {
 }
 
 export async function consumeKey(code: string) {
+  const cardKey = await prisma.cardKey.findUnique({ where: { code } });
+  if (!cardKey || cardKey.status !== "LOCKED") {
+    throw new Error("卡密未锁定，无法消耗");
+  }
+
+  const nextUsedCount = cardKey.usedCount + 1;
+  const fullyConsumed = nextUsedCount >= cardKey.maxUses;
+
   const result = await prisma.cardKey.updateMany({
     where: { code, status: "LOCKED" },
     data: {
-      status: "CONSUMED",
-      consumedAt: new Date(),
+      usedCount: nextUsedCount,
+      status: fullyConsumed ? "CONSUMED" : "UNUSED",
+      consumedAt: fullyConsumed ? new Date() : null,
+      lockedAt: null,
+      lockJobId: null,
     },
   });
 
