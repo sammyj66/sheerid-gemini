@@ -22,6 +22,23 @@ export async function POST(request: Request) {
     );
   }
 
+  if (cardKey && !verificationId) {
+    const cardKeyData = await prisma.cardKey.findUnique({
+      where: { code: cardKey },
+    });
+    if (!cardKeyData) {
+      return Response.json({ found: false });
+    }
+    return Response.json({
+      found: true,
+      status: cardKeyData.status,
+      cardKeyCode: cardKeyData.code,
+      maxUses: cardKeyData.maxUses,
+      usedCount: cardKeyData.usedCount,
+      remainingUses: cardKeyData.maxUses - cardKeyData.usedCount,
+    });
+  }
+
   const job = await prisma.verificationJob.findFirst({
     where: {
       ...(cardKey ? { cardKeyCode: cardKey } : {}),
